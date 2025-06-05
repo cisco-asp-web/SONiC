@@ -1,0 +1,104 @@
+# ansible-playbook -i hosts lab_base_config-playbook.yml -e "ansible_user=cisco ansible_ssh_pass=cisco123 ansible_sudo_pass=cisco123" -vv
+
+- name: Apply baseline config to SONiC routers, and install nano
+  hosts: sonic_routers
+  become: true
+  tasks:
+
+    - name: Copy config_baseline.json files
+      copy:
+        src: "{{ inventory_hostname }}/config_baseline.json"
+        dest: "/etc/sonic/config_db.json"
+        mode: 0644
+
+    - name: sonic config load
+      command: "sudo config load /etc/sonic/config_db.json -y"
+      ignore_errors: yes
+    
+    - name: log sonic config load
+      lineinfile:
+        path: "/home/cisco/deploy.log"
+        line: "{{ ansible_date_time.date }} {{ansible_date_time.time}} {{ansible_date_time.tz}}: Loading baseline config for {{ inventory_hostname }}"
+        create: yes
+      delegate_to: localhost
+
+    - name: restart hostname service
+      command: sudo systemctl restart hostname-config
+      ignore_errors: yes
+
+    - name: Copy loopback shell script
+      copy:
+        src: "{{ inventory_hostname }}/loopback.sh"
+        dest: "/etc/sonic/loopback.sh"
+        mode: 0755
+
+    - name: run loopback shell script
+      command: "/etc/sonic/loopback.sh"
+      ignore_errors: yes
+
+    - name: Save sonic configuration from redis to config_db
+      command: "sudo config save -y"
+      ignore_errors: yes
+
+- name: Load FRR BGP config on spine-1, spine-2, and leaf-2
+  hosts: sonic_routers
+  become: true
+  tasks:
+
+    - name: Create a backup of the existing FRR file
+      command: mv /etc/sonic/frr/bgpd.conf /etc/sonic/frr/bgpd.conf.bak
+      args:
+        creates: /etc/sonic/frr/bgpd.conf.bak
+      ignore_errors: yes
+      register: backup_result
+
+    - name: Copy frr config files
+      copy:
+        src: "{{ inventory_hostname }}/frr.conf"
+        dest: "/etc/sonic/frr/bgpd.conf"
+        mode: 0644
+
+    - name: Load the FRR config through vtysh
+      command: vtysh -f /etc/sonic/frr/bgpd.conf
+      ignore_errors: yes
+      register: frr_load_result
+
+    - name: log FRR BGP config load
+      lineinfile:
+        path: "/home/cisco/deploy.log"
+        line: "{{ ansible_date_time.date }} {{ansible_date_time.time}} {{ansible_date_time.tz}}: Load FRR BGP config for {{ inventory_hostname }}"
+        create: yes
+      delegate_to: localhost
+      
+# Below section used to load nano app into SONiC router
+    - name: log nano install
+      lineinfile:
+        path: "/home/cisco/deploy.log"
+        line: "{{ ansible_date_time.date }} {{ansible_date_time.time}} {{ansible_date_time.tz}}: Installing nano on {{ inventory_hostname }}"
+        create: yes
+      delegate_to: localhost
+
+    - name: backup old debian apt sources.list
+      command: "sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak"
+      ignore_errors: yes
+
+    - name: Copy debian apt sources.list file
+      copy:
+        src: "{{ inventory_hostname }}/sources.list"
+        dest: "/etc/apt/sources.list"
+        mode: 0644
+
+    - name: run apt update
+      command: "sudo apt update"
+      ignore_errors: yes
+
+    - name: apt install nano
+      command: "sudo apt install nano -y"
+      ignore_errors: yes
+
+    - name: log base config complete
+      lineinfile:
+        path: "/home/cisco/deploy.log"
+        line: "{{ ansible_date_time.date }} {{ansible_date_time.time}} {{ansible_date_time.tz}}: base config complete for {{ inventory_hostname }}"
+        create: yes
+      delegate_to: localhost

@@ -1,0 +1,82 @@
+---
+
+# ansible-playbook -i hosts sonic-rtr-leaf-1-rebuild.yml -e "ansible_user=cisco ansible_ssh_pass=cisco123 ansible_sudo_pass=cisco123" -vv
+
+- name: Rebuild sonic-rtr-leaf-1 on failure to come up
+  hosts: linux-host-1
+  become: true
+  tasks:
+      
+    - name: run containerlab destroy command to destroy failed sonic-rtr-leaf-1
+      command: sudo containerlab destroy -t linux-host-1/clab.yml"
+      args:
+        chdir: /home/cisco/sonic-dcloud/1-SONiC_101/ansible/files/
+      ignore_errors: yes
+
+    - name: run containerlab deploy command to re-launch sonic vxr sonic-rtr-leaf-1
+      command: sudo containerlab deploy -t linux-host-1/clab.yml"
+      args:
+        chdir: /home/cisco/sonic-dcloud/1-SONiC_101/ansible/files/
+      ignore_errors: yes
+
+    - name: run vxlan shell script to interconnect containerlab nodes across VMs
+      command: "linux-host-1/vxlan.sh"
+      args:
+        chdir: /home/cisco/sonic-dcloud/1-SONiC_101/ansible/files/
+      ignore_errors: yes
+
+    - name: reset user/group permissions on repo folders 
+      command: "chown -R cisco:cisco /home/cisco/sonic-dcloud"
+      ignore_errors: yes
+
+    - name: clear old ssh keys 
+      command: "rm .ssh/known_hosts"
+      args:
+        chdir: /home/cisco/
+      ignore_errors: yes
+
+    - name: Pause for 5 minutes
+      pause:
+        minutes: 5
+
+    - name: Wait for 'Router' to appear in logs
+      shell: docker logs -t {{ hostvars[inventory_hostname]['container'] }} | grep Router
+      register: grep_result
+      until: grep_result.stdout_lines | length > 0
+      retries: 18  # Number of times to retry
+      delay: 30  # Delay between retries
+      timeout: 600  # Maximum time to wait (in seconds) 
+      
+    - name: Save grep output to a local log file
+      lineinfile:
+        path: "/home/cisco/deploy.log"
+        line: "{{inventory_hostname}} {{ grep_result.stdout }}"
+        create: yes
+      delegate_to: localhost
+
+    - name: Ping test sonic-rtr-leaf-1
+      shell: ping -c 1 -W 5 192.168.122.101
+      register: ping_result
+      ignore_errors: true
+
+    - name: Check if ping was successfull 
+      when: ( ping_result.failed == true)
+      debug:
+        msg: "Leaf 1 ping failed"
+
+    - name: Save grep output to a local log file
+      lineinfile:
+          path: "/home/cisco/deploy.log"
+          line: "SONiC router sonic-rtr-leaf-1 deployment failed. Restarting build."
+          create: yes
+
+    - name: Test Ping Result Leaf 1
+      when: ( ping_result.failed == false)
+      debug:
+        msg: "Leaf 1 ping success"
+
+    - name: print debug
+      debug:
+        msg: "{{ ping_result.stdout }}"
+      
+
