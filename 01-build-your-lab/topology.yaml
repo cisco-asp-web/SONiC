@@ -1,0 +1,31 @@
+simulation:
+  skip_platform_check: True
+  sim_dir: /home/cisco/vxr/sonic_spine_leaf_ngdp
+  skip_auto_bringup : True
+  no_image_copy: true
+  vxr_sim_config:
+    default:
+       ConfigEnableNgdp: 'true'
+
+devices:
+# Leaf 1
+  r1:
+    console_ports: [40001]
+    memory: 10G
+    platform: spitfire_f
+    linecard_types: [8102-64H]
+    os_type: sonic
+    custom_mgmt_inf: True
+    mgmt_intf_address: 198.18.122.11/16
+    linux_username: "admin"
+    linux_password: "password"
+    image: /opt/cisco/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/suhahmad/sonic/images/vxlan/sonic-cisco-8000.bin
+    data_ports:
+      - Ethernet0
+      - Ethernet4
+      - Ethernet8
+      - Ethernet12
+    vxr_sim_config:
+      shelf:
+        ConfigMgmtMacAddr: "00:01:02:03:04:01" 
