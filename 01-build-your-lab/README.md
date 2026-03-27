@@ -11,6 +11,7 @@ A quick guide to acquiring your SONiC 8000 emulator images and installing the VX
     - [pyvxr CLI tool](#pyvxr-cli-tool)
   - [VXR Topology File](#vxr-topology-file)
     - [Notes on the VXR topology file:](#notes-on-the-vxr-topology-file)
+  - [Start the Topology Simulation](#start-the-topology-simulation)
 
 
 ### Cisco dCloud Overview
@@ -159,10 +160,53 @@ simulation:
         ConfigMgmtMacAddr: "00:01:02:03:04:01" 
 ```
 
-3. cd into the project directory and start the topology/simulation
+### Start the Topology Simulation
+
+1. cd into the project directory and start the topology/simulation
 ```
 cd ./SONiC/01-build-your-lab/
 ```
 ```
 vxr.py start topology.yaml
 ```
+
+The topology startup will take 8-10 minutes.
+A common error: missing SDK file:
+```
+Found FATAL errors in vxr log file
+!!!!! ERROR LOADING SHARED LIBRARIES !!!!!
+FATAL: !!!!! Failed to load NGDP library: libngdp-gib-24.11.4140.17-4.so !!!!!
+```
+
+If an error such as this occurs:
+
+1. Navigate back to the VXR downloads site and click the *`more sdks here`* link: [http://vxr8000/8000/ngdp/](http://vxr8000/8000/ngdp/) 
+
+2. Find and download the debian package that matches the missing file name. In this case: [vxr2-ngdp-24.11.4140.17_1-1_all.deb](vxr2-ngdp-24.11.4140.17_1-1_all.deb)
+
+3. Copy the file to your topology host server:
+```
+scp vxr2-ngdp-24.11.4140.17_1-1_all.deb cisco@198.18.133.100:images/
+```
+
+4. Install the debian package
+```
+cd ./images/
+sudo dpkg -i vxr2*.deb
+```
+
+or
+```
+sudo dpkg -i vxr2-ngdp-24.11.4140.17_1-1_all.deb 
+```
+
+Example output:
+```
+Selecting previously unselected package vxr2-ngdp-24.11.4140.17.
+(Reading database ... 187672 files and directories currently installed.)
+Preparing to unpack vxr2-ngdp-24.11.4140.17_1-1_all.deb ...
+Unpacking vxr2-ngdp-24.11.4140.17 (1-1) ...
+Setting up vxr2-ngdp-24.11.4140.17 (1-1) ...
+```
+
+5. Try running *`vxr.py start`* again
