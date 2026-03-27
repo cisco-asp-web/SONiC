@@ -1,6 +1,6 @@
 simulation:
   skip_platform_check: True
-  sim_dir: /home/cisco/vxr/sonic_spine_leaf_ngdp
+  sim_dir: /home/cisco/SONiC
   skip_auto_bringup : True
   no_image_copy: true
   vxr_sim_config:
@@ -16,11 +16,11 @@ devices:
     linecard_types: [8102-64H]
     os_type: sonic
     custom_mgmt_inf: True
-    mgmt_intf_address: 198.18.122.11/16
+    mgmt_intf_address: 192.168.122.101/16
     linux_username: "admin"
     linux_password: "password"
-    image: /opt/cisco/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/suhahmad/sonic/images/vxlan/sonic-cisco-8000.bin
+    image: ./onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: ./sonic-cisco-8000.bin
     data_ports:
       - Ethernet0
       - Ethernet4
@@ -29,3 +29,69 @@ devices:
     vxr_sim_config:
       shelf:
         ConfigMgmtMacAddr: "00:01:02:03:04:01" 
+
+# Leaf 1
+  r2:
+    console_ports: [40002]
+    memory: 10G
+    platform: spitfire_f
+    linecard_types: [8102-64H]
+    os_type: sonic
+    custom_mgmt_inf: True
+    mgmt_intf_address: 192.168.122.102/16
+    linux_username: "admin"
+    linux_password: "password"
+    image: ./onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: ./sonic-cisco-8000.bin
+    data_ports:
+      - Ethernet0
+      - Ethernet4
+      - Ethernet8
+      - Ethernet12
+    vxr_sim_config:
+      shelf:
+        ConfigMgmtMacAddr: "00:01:02:03:04:02" 
+
+# Spine 1
+  r3:
+    console_ports: [40003]
+    memory: 10G
+    platform: spitfire_f
+    linecard_types: [8102-64H]
+    os_type: sonic
+    custom_mgmt_inf: True
+    mgmt_intf_address: 192.168.122.103/16
+    linux_username: "admin"
+    linux_password: "password"
+    image: ./onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: ./sonic-cisco-8000.bin
+    data_ports:
+      - Ethernet0
+      - Ethernet4
+      - Ethernet8
+      - Ethernet12
+    vxr_sim_config:
+      shelf:
+        ConfigMgmtMacAddr: "00:01:02:03:04:03" 
+
+# Spine 2
+  r4:
+    console_ports: [40004]
+    memory: 10G
+    platform: spitfire_f
+    linecard_types: [8102-64H]
+    os_type: sonic
+    custom_mgmt_inf: True
+    mgmt_intf_address: 192.168.122.104/16
+    linux_username: "admin"
+    linux_password: "password"
+    image: ./onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: ./sonic-cisco-8000.bin
+    data_ports:
+      - Ethernet0
+      - Ethernet4
+      - Ethernet8
+      - Ethernet12
+    vxr_sim_config:
+      shelf:
+        ConfigMgmtMacAddr: "00:01:02:03:04:04" 
