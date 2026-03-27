@@ -10,6 +10,7 @@ A quick guide to acquiring your SONiC 8000 emulator images and installing the VX
   - [Install VXR](#install-vxr)
     - [pyvxr CLI tool](#pyvxr-cli-tool)
   - [VXR Topology File](#vxr-topology-file)
+    - [Notes on the VXR topology file:](#notes-on-the-vxr-topology-file)
 
 
 ### Cisco dCloud Overview
@@ -108,7 +109,7 @@ Similar to tools like containerlab, VXR uses a yaml file for defining virtual ne
 git clone https://github.com/cisco-asp-web/SONiC.git
 ```
 
-2. Optional: move or copy the SONiC *`onie`* and *`sonic.bin`* files to a directory where you plan to do your work
+2. Move or copy the SONiC *`onie`* and *`sonic.bin`* files to a directory where you plan to do your work
 
 ```
 ls images/8000-eft17.0/packages/images/8000/sonic/
@@ -117,10 +118,12 @@ ls images/8000-eft17.0/packages/images/8000/sonic/
 ```
 cp images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso /home/cisco/images/
 
-cp images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin /home/cisco/images/
+cp images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin /home/cisco/images/sonic-cisco-8000-vxmh.bin
 ```
 
-Notes on the VXR topology file:
+>[Note] We've renamed the sonic-cisco-8000.bin file to be *`sonic-cisco-8000-vxmh.bin`* as the particular image we're using for this project supports VXLAN multi-homing.
+
+#### Notes on the VXR topology file:
 
 ```diff
 simulation:

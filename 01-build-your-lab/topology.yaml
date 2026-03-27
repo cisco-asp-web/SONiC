@@ -20,7 +20,7 @@ devices:
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/cisco/images/sonic-cisco-8000.bin
+    onie-install: /home/cisco/images/sonic-cisco-8000-vxmh.bin
     data_ports:
       - Ethernet0
       - Ethernet4
@@ -42,7 +42,7 @@ devices:
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/cisco/images/sonic-cisco-8000.bin
+    onie-install: /home/cisco/images/sonic-cisco-8000-vxmh.bin
     data_ports:
       - Ethernet0
       - Ethernet4
@@ -64,7 +64,7 @@ devices:
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/cisco/images/sonic-cisco-8000.bin
+    onie-install: /home/cisco/images/sonic-cisco-8000-vxmh.bin
     data_ports:
       - Ethernet0
       - Ethernet4
@@ -86,7 +86,7 @@ devices:
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/cisco/images/sonic-cisco-8000.bin
+    onie-install: /home/cisco/images/sonic-cisco-8000-vxmh.bin
     data_ports:
       - Ethernet0
       - Ethernet4
