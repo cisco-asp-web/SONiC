@@ -8,6 +8,7 @@ A quick guide to acquiring your SONiC 8000 emulator images and installing the VX
   - [Cisco dCloud Overview](#cisco-dcloud-overview)
   - [Acquire VXR Package and SONiC Images](#acquire-vxr-package-and-sonic-images)
   - [Install VXR](#install-vxr)
+    - [pyvxr CLI tool](#pyvxr-cli-tool)
   - [VXR Topology File](#vxr-topology-file)
 
 
@@ -72,6 +73,32 @@ A successful run will end with:
 [SERVER SETUP IS COMPLETED]
 ```
 
+#### pyvxr CLI tool
+
+1. The VXR installation includes the pyvxr CLI tool which we'll use to start, stop, or check the status on our sonic virtual topologies
+
+```
+vxr.py -h
+```
+
+Example partial output:
+```
+$ vxr.py -h
+usage: vxr.py [-h] [--version]
+    {start,clean,consoles,stop,ports,restart,sim-info,sim-check,status,logs,id,bringup,toxml,vcpu-count,oir,save-xr-config,restore-xr-config,nsim-log,user_ctl,dump,ngdp,link,tcpdump,help}
+```
+
+2. Check VXR version:
+```
+vxr.py --version
+```
+
+Example output:
+```
+$ vxr.py --version
+1.6.67
+```
+
 ### VXR Topology File
 
 Similar to tools like containerlab, VXR uses a yaml file for defining virtual network topology and node parameters. [topology file for our project](./topology.yaml)
@@ -88,9 +115,51 @@ ls images/8000-eft17.0/packages/images/8000/sonic/
 ```
 
 ```
-cp images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso SONiC/01-build-your-lab/
+cp images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso /home/cisco/images/
 
-cp images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin SONiC/01-build-your-lab/
+cp images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin /home/cisco/images/
 ```
 
-3. Construct VXR topology file
+Notes on the VXR topology file:
+
+```diff
+simulation:
+  skip_platform_check: True
++  sim_dir: /home/cisco/SONiC  <-- directory we'll run the simulation from; also location for log files
+  skip_auto_bringup : True
+  no_image_copy: true
+  vxr_sim_config:
+    default:
+       ConfigEnableNgdp: 'true'
+
++devices:    <-- section where we define the nodes in our topology
+# Leaf 1
+  r1:
++    console_ports: [40001] <-- console access
++    memory: 10G  <-- documentation recommends 20G but we can do 10G
+    platform: spitfire_f
++    linecard_types: [8102-64H]  <-- see supported platforms in the vxr release site
++    os_type: sonic  <-- vxr also supports ios-xr
+    custom_mgmt_inf: True
+    mgmt_intf_address: 192.168.122.101/16
+    linux_username: "admin"
+    linux_password: "password"
++    image: /home/cisco/images/onie-recovery-x86_64-cisco_8000-r0.iso <-- note 'absolute paths'
++    onie-install: /home/cisco/images/sonic-cisco-8000.bin  <--
+    data_ports:
+      - Ethernet0
+      - Ethernet4
+      - Ethernet8
+      - Ethernet12
+    vxr_sim_config:
+      shelf:
+        ConfigMgmtMacAddr: "00:01:02:03:04:01" 
+```
+
+3. cd into the project directory and start the topology/simulation
+```
+cd ./SONiC/01-build-your-lab/
+```
+```
+vxr.py start topology.yaml
+```
