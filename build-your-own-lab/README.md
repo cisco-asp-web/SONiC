@@ -210,3 +210,27 @@ Setting up vxr2-ngdp-24.11.4140.17 (1-1) ...
 ```
 
 5. Try running *`vxr.py start`* again
+```
+cd ../SONiC/01-build-your-lab/
+
+vxr.py start topology.yaml 
+```
+
+Once the topology simulation is up and running the output will look something like this:
+```
+08:55:56 INFO Vxr up on host localhost
+08:55:56 INFO Getting port vector files for:r1, r2, r3, r4
+08:56:28 INFO Sim up
+```
+
+>[Note] it'll still take the 8000 emulator nodes a few minutes to fully boot
+
+6. Test console access and monitor sonic node bootup:
+```
+telnet 0 40001
+```
+
+Example output:
+```
+
+```
