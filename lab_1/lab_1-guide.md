@@ -72,5 +72,6 @@ We will have achieved the following objectives upon completion of Lab 1:
 
 ## Configuration Management
 
+### REDIS Database queries and verification of config
 ## End of Lab 1
 Lab 1 is completed, please proceed to [Lab 2](https://github.com/cisco-asp-web/SONiC/blob/main/lab_2/lab_2-guide.md)
