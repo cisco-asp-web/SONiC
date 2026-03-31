@@ -1,4 +1,4 @@
-# Lab 2 Guide: SONiC and FRR, Building a BGP Fabric [50 Min]
+# Lab 6 SONiC Building an AI Backend Network on Cisco 8000 [40 Min]
 
 We use containerlab to orchestrate the VXR and SONiC virtual network topologies. 
 
@@ -8,17 +8,17 @@ https://containerlab.dev/
 
 
 ## Contents
-- Lab 2 Guide: SONiC and FRR, Building a BGP Fabric [50 Min]
+- Lab 6 SONiC and FRR, Building a VXLAN EVPN Fabric [100 Min]
   - [Contents](#contents)
   - [Lab Objectives](#lab-objectives)
   - [Topology](#topology)
   - [VXR Ovewview](#vxr-overview)
   - [Image Management](#image-management)
   - [Configuration Management](#configuration-management)
-  - [End of Lab 2](#end-of-lab-2)
+  - [End of Lab 6](#end-of-lab-6)
   
 ## Lab Objectives
-We will have achieved the following objectives upon completion of Lab 2:
+We will have achieved the following objectives upon completion of Lab 6:
 
 * Access all devices in the lab
 * Deployed the full network topology (XRd frontend, SONiC backend)
@@ -41,5 +41,5 @@ We will have achieved the following objectives upon completion of Lab 2:
 ## Configuration Management
 
 
-## End of Lab 2
-Lab 2 is completed, please proceed to [Lab 3](https://github.com/cisco-asp-web/SONiC/blob/main/lab_3/lab_3-guide.md)
+## End of Lab 6
+Lab 6 is completed, great job!
