@@ -96,17 +96,17 @@ devices:
 connections:
   hubs:
     l00s00:         
-      - leaf00.Ethernet0/0
-      - spine00.Ethernet0/0
+      - leaf00.Ethernet0
+      - spine00.Ethernet0
 
     l00s01:         
-      - leaf00.Ethernet1/0
-      - spine01.Ethernet0/0
+      - leaf00.Ethernet1
+      - spine01.Ethernet0
 
     l01s00:         
-      - leaf01.Ethernet0/0
-      - spine00.Ethernet1/0
+      - leaf01.Ethernet0
+      - spine00.Ethernet1
 
     l01s01:         
-      - leaf01.Ethernet1/0
-      - spine01.Ethernet1/0
+      - leaf01.Ethernet1
+      - spine01.Ethernet1
