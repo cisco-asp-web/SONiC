@@ -19,8 +19,8 @@ devices:
     mgmt_intf_address: 192.168.122.101/16
     linux_username: "admin"
     linux_password: "password"
-    image: /home/cisco/images/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/cisco/images/sonic-cisco-8000.bin
+    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
     data_ports:
       - Ethernet0
       - Ethernet4
@@ -41,8 +41,8 @@ devices:
     mgmt_intf_address: 192.168.122.102/16
     linux_username: "admin"
     linux_password: "password"
-    image: /home/cisco/images/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/cisco/images/sonic-cisco-8000.bin
+    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
     data_ports:
       - Ethernet0
       - Ethernet4
@@ -63,8 +63,8 @@ devices:
     mgmt_intf_address: 192.168.122.103/16
     linux_username: "admin"
     linux_password: "password"
-    image: /home/cisco/images/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/cisco/images/sonic-cisco-8000.bin
+    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
     data_ports:
       - Ethernet0
       - Ethernet4
@@ -85,8 +85,8 @@ devices:
     mgmt_intf_address: 192.168.122.104/16
     linux_username: "admin"
     linux_password: "password"
-    image: /home/cisco/images/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/cisco/images/sonic-cisco-8000.bin
+    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
     data_ports:
       - Ethernet0
       - Ethernet4
