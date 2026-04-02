@@ -28,6 +28,9 @@ devices:
     vxr_sim_config:
       shelf:
         ConfigMgmtMacAddr: "00:01:02:03:04:01" 
+    cli_commands: |
+                sudo config hostname leaf00
+                sudo config interface ip add eth0 192.168.122.100/24
 
   leaf01:
     console_ports: [40001]
@@ -49,6 +52,9 @@ devices:
     vxr_sim_config:
       shelf:
         ConfigMgmtMacAddr: "00:01:02:03:04:02" 
+    cli_commands: |
+                sudo config hostname leaf01
+                sudo config interface ip add eth0 192.168.122.101/24
 
 # Spine 1
   spine00:
@@ -71,6 +77,9 @@ devices:
     vxr_sim_config:
       shelf:
         ConfigMgmtMacAddr: "00:01:02:03:04:03" 
+    cli_commands: |
+                sudo config hostname spine00
+                sudo config interface ip add eth0 192.168.122.102/24
 
   spine01:
     console_ports: [40003]
@@ -92,6 +101,9 @@ devices:
     vxr_sim_config:
       shelf:
         ConfigMgmtMacAddr: "00:01:02:03:04:04" 
+    cli_commands: |
+                sudo config hostname spine01
+                sudo config interface ip add eth0 192.168.122.103/24
 
 connections:
   hubs:
