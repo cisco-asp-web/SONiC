@@ -1,21 +1,38 @@
 simulation:
-  skip_platform_check: True
-  sim_dir: /home/cisco/SONiC/build-your-own-lab
-  skip_auto_bringup : True
   no_image_copy: true
-  vxr_sim_config:
-    default:
-       ConfigEnableNgdp: 'true'
 
 devices:
   leaf00:
     console_ports: [40000]
-    memory: 10G
+    memory: 12G
     platform: spitfire_f
     linecard_types: [8102-64H]
     os_type: sonic
-    # custom_mgmt_inf: True
-    # mgmt_intf_address: 192.168.122.100/24
+    custom_mgmt_inf: True
+    mgmt_intf_address: 192.168.122.100/24
+    linux_username: "admin"
+    linux_password: "password"
+    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
+    data_ports:
+      - Ethernet0
+      - Ethernet4
+      - Ethernet8
+      - Ethernet12
+    vxr_sim_config:
+      shelf:
+        ConfigMgmtMacAddr: "00:01:02:03:04:00" 
+    cli_commands: |
+                sudo config hostname leaf00
+
+  leaf01:
+    console_ports: [40001]
+    memory: 12G
+    platform: spitfire_f
+    linecard_types: [8102-64H]
+    os_type: sonic
+    custom_mgmt_inf: True
+    mgmt_intf_address: 192.168.122.101/24
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
@@ -29,17 +46,16 @@ devices:
       shelf:
         ConfigMgmtMacAddr: "00:01:02:03:04:01" 
     cli_commands: |
-                sudo config hostname leaf00
-                sudo config interface ip add eth0 192.168.122.100/24
+                sudo config hostname leaf01
 
-  leaf01:
-    console_ports: [40001]
+  spine00:
+    console_ports: [40002]
     memory: 10G
     platform: spitfire_f
     linecard_types: [8102-64H]
     os_type: sonic
-    # custom_mgmt_inf: True
-    # mgmt_intf_address: 192.168.122.101/24
+    custom_mgmt_inf: True
+    mgmt_intf_address: 192.168.122.102/24
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
@@ -53,18 +69,16 @@ devices:
       shelf:
         ConfigMgmtMacAddr: "00:01:02:03:04:02" 
     cli_commands: |
-                sudo config hostname leaf01
-                sudo config interface ip add eth0 192.168.122.101/24
+                sudo config hostname spine00
 
-# Spine 1
-  spine00:
-    console_ports: [40002]
+  spine01:
+    console_ports: [40003]
     memory: 10G
     platform: spitfire_f
     linecard_types: [8102-64H]
     os_type: sonic
-    # custom_mgmt_inf: True
-    # mgmt_intf_address: 192.168.122.102/24
+    custom_mgmt_inf: True
+    mgmt_intf_address: 192.168.122.103/24
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
@@ -78,32 +92,7 @@ devices:
       shelf:
         ConfigMgmtMacAddr: "00:01:02:03:04:03" 
     cli_commands: |
-                sudo config hostname spine00
-                sudo config interface ip add eth0 192.168.122.102/24
-
-  spine01:
-    console_ports: [40003]
-    memory: 10G
-    platform: spitfire_f
-    linecard_types: [8102-64H]
-    os_type: sonic
-    # custom_mgmt_inf: True
-    # mgmt_intf_address: 192.168.122.103/24
-    linux_username: "admin"
-    linux_password: "password"
-    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
-    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
-    data_ports:
-      - Ethernet0
-      - Ethernet4
-      - Ethernet8
-      - Ethernet12
-    vxr_sim_config:
-      shelf:
-        ConfigMgmtMacAddr: "00:01:02:03:04:04" 
-    cli_commands: |
                 sudo config hostname spine01
-                sudo config interface ip add eth0 192.168.122.103/24
 
 connections:
   hubs:
