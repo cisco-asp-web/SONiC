@@ -23,6 +23,9 @@ devices:
         SONIC_COMMANDS
     custom_mgmt_inf: True
     console_ports: [60000, 60001]
+    cli_commands: |
+                sudo config hostname leaf00
+                sudo config interface ip add eth0 192.168.123.2/24
 
   leaf01:
     platform: spitfire_f
@@ -43,6 +46,9 @@ devices:
         SONIC_COMMANDS
     custom_mgmt_inf: True
     console_ports: [60002, 60003]
+    cli_commands: |
+                sudo config hostname leaf01
+                sudo config interface ip add eth0 192.168.123.3/24
 
   spine00:
     platform: spitfire_f
@@ -63,6 +69,9 @@ devices:
         SONIC_COMMANDS
     custom_mgmt_inf: True
     console_ports: [60004, 60005]
+    cli_commands: |
+                sudo config hostname spine00
+                sudo config interface ip add eth0 192.168.123.4/24
 
   spine01:
     platform: spitfire_f
@@ -83,6 +92,9 @@ devices:
         SONIC_COMMANDS
     custom_mgmt_inf: True 
     console_ports: [60006, 60007]
+    cli_commands: |
+                sudo config hostname spine01
+                sudo config interface ip add eth0 192.168.123.5/24
 
 connections:
 
