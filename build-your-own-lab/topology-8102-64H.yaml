@@ -14,8 +14,8 @@ devices:
     platform: spitfire_f
     linecard_types: [8102-64H]
     os_type: sonic
-    custom_mgmt_inf: True
-    mgmt_intf_address: 192.168.122.100/24
+    # custom_mgmt_inf: True
+    # mgmt_intf_address: 192.168.122.100/24
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
@@ -38,8 +38,8 @@ devices:
     platform: spitfire_f
     linecard_types: [8102-64H]
     os_type: sonic
-    custom_mgmt_inf: True
-    mgmt_intf_address: 192.168.122.101/24
+    # custom_mgmt_inf: True
+    # mgmt_intf_address: 192.168.122.101/24
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
@@ -63,8 +63,8 @@ devices:
     platform: spitfire_f
     linecard_types: [8102-64H]
     os_type: sonic
-    custom_mgmt_inf: True
-    mgmt_intf_address: 192.168.122.102/24
+    # custom_mgmt_inf: True
+    # mgmt_intf_address: 192.168.122.102/24
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
@@ -87,8 +87,8 @@ devices:
     platform: spitfire_f
     linecard_types: [8102-64H]
     os_type: sonic
-    custom_mgmt_inf: True
-    mgmt_intf_address: 192.168.122.103/24
+    # custom_mgmt_inf: True
+    # mgmt_intf_address: 192.168.122.103/24
     linux_username: "admin"
     linux_password: "password"
     image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
