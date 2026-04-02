@@ -1,6 +1,6 @@
 ## Building a SONiC Cisco 8000 Emulator lab with VXR 
 
-A quick guide to acquiring your SONiC 8000 emulator images and installing the VXR orchestrator tool
+A quick guide to acquiring your SONiC 8000 emulator images, installing the VXR orchestrator tool, and deploying a topology
 
 ### Contents
 - [Building a SONiC Cisco 8000 Emulator lab with VXR](#building-a-sonic-cisco-8000-emulator-lab-with-vxr)
@@ -17,8 +17,6 @@ A quick guide to acquiring your SONiC 8000 emulator images and installing the VX
 ### Cisco dCloud Overview
 dCloud is Cisco's cloud based demo platform that showcases a large catalog of demos, training and sandboxes for every Cisco architecture. This is the chosen platform to demonstrate our SONiC labs as they will be available through Cisco's global DC infrastructure.
 
-For each lab within this repository you will find a corresponding lab in dCloud. You will need a dCloud account in order to access these labs. You can login to dCloud at https://dcloud.cisco.com
-
 Once you have scheduled a lab in dCloud Cisco AnyConnect VPN connection information will be provided for the lab instance. Once the dCloud session is deployed, all lab guides, configs, diagrams, and code are here in this github repository.
 
 For instructions to build your own dCloud instance to host a SONiC 8000 emulator topology see [BYO dCloud Guide](https://github.com/brmcdoug/byo-dcloud/blob/main/Lab-Guide-for-BYO-dCloud-Lab.pdf)
@@ -26,42 +24,42 @@ For instructions to build your own dCloud instance to host a SONiC 8000 emulator
 ### Acquire VXR Package and SONiC Images
 
 1. Navigate to the [VXR Release site](http://vxr8000/8000/), select "Go to latest release"
-2. Select the [General EFT 17.0 release](http://vxr-nfs-02/8000/download/eft17.0/base_release)
+2. Select the [General EFT 17.1 release](http://vxr-nfs-02/8000/download/eft17.1/base_release)
 3. Download both the 8000-emulator-eft tarball and the 8000-sonic-eft tarball:
 
-[8000-emulator-tar](http://vxr-nfs-02/8000/download/eft17.0/base_release/8000-emulator-eft17.0.tar)
+[8000-emulator-tar](http://vxr-nfs-02/8000/download/eft17.1/base_release/8000-emulator-eft17.1.tar)
 
-[8000-sonic-image-tar](http://vxr-nfs-02/8000/download/eft17.0/base_release/8000-sonic-eft17.0.tar)
+[8000-sonic-image-tar](http://vxr-nfs-02/8000/download/eft17.1/base_release/8000-sonic-eft17.1.tar)
 
 4. Aaaand when they're done downloading you can upload them to your Ubuntu topology host. Example:
 ```
-scp 8000-emulator-eft17.0.tar cisco@198.18.133.100:/home/cisco/images
-scp 8000-sonic-eft17.0.tar cisco@198.18.133.100:/home/cisco/images
+scp 8000-emulator-eft17.1.tar cisco@198.18.133.100:/home/cisco/images
+scp 8000-sonic-eft17.1.tar cisco@198.18.133.100:/home/cisco/images
 ```
 
 ### Install VXR
 
 1. untar both packages, 8000-emulator first:
 ```
-tar -xvf 8000-emulator-eft17.0.tar
+tar -xvf 8000-emulator-eft17.1.tar
 ```
 
-Then untar the 8000-sonic package, which will extract files into the ./8000-eft/ directory:
+Then untar the 8000-sonic package, which will extract files into the ./8000-eft17.1/ directory:
 ```
-tar -xvf 8000-sonic-eft17.0.tar 
+tar -xvf 8000-sonic-eft17.1.tar 
 ```
 
 Example tail of the output:
 ```
-8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
-8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.qcow2
-8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
+8000-eft17.1/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+8000-eft17.1/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.qcow2
+8000-eft17.1/packages/images/8000/sonic/sonic-cisco-8000.bin
 ```
 
 
-2. cd into the 8000-eft17.0/ scripts directory and run the ubuntu installation script
+2. cd into the 8000-eft17.1/ scripts directory and run the ubuntu installation script
 ```
-cd ./8000-eft17.0/scripts
+cd ./8000-eft17.1/scripts
 ```
 
 ```
@@ -113,13 +111,13 @@ git clone https://github.com/cisco-asp-web/SONiC.git
 2. Move or copy the SONiC *`onie`* and *`sonic.bin`* files to a directory where you plan to do your work
 
 ```
-ls images/8000-eft17.0/packages/images/8000/sonic/
+ls images/8000-eft17.1/packages/images/8000/sonic/
 ```
 
 ```
-cp images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso /home/cisco/images/
+cp images/8000-eft17.1/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso /home/cisco/images/
 
-cp images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin /home/cisco/images/sonic-cisco-8000-vxmh.bin
+cp images/8000-eft17.1/packages/images/8000/sonic/sonic-cisco-8000.bin /home/cisco/images/sonic-cisco-8000-vxmh.bin
 ```
 
 >[Note] We've renamed the sonic-cisco-8000.bin file to be *`sonic-cisco-8000-vxmh.bin`* as the particular image we're using for this project supports VXLAN multi-homing.
