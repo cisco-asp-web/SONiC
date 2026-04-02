@@ -1,0 +1,110 @@
+simulation:
+  no_image_copy: True
+
+devices:
+
+  leaf00:
+    platform: spitfire_f
+    os_type: sonic
+    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
+    memory: "20G"
+    linecard_types: ['8102-64H']
+    linux_username: admin
+    linux_password: password
+    # after booting onie, we will download sonic image via eth4
+    mgmt_gateway_ip: "192.168.123.1"
+    linux_config: |
+        ip addr add dev eth4 192.168.123.2/24
+        ip link set dev eth4 up
+    xr_config: |
+        sudo config interface ip add eth0 MGMT_IP/MGMT_MASK MGMT_GATEWAY
+        sudo config save -y
+        SONIC_COMMANDS
+    custom_mgmt_inf: True
+    console_ports: [60000, 60001]
+
+  leaf01:
+    platform: spitfire_f
+    os_type: sonic
+    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
+    memory: "20G"
+    linecard_types: ['8102-64H']
+    linux_username: admin
+    linux_password: password
+    mgmt_gateway_ip: "192.168.123.1"
+    linux_config: |
+        ip addr add dev eth4 192.168.123.3/24
+        ip link set dev eth4 up
+    xr_config: |
+        sudo config interface ip add eth0 MGMT_IP/MGMT_MASK MGMT_GATEWAY
+        sudo config save -y
+        SONIC_COMMANDS
+    custom_mgmt_inf: True
+    console_ports: [60002, 60003]
+
+  spine00:
+    platform: spitfire_f
+    os_type: sonic
+    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
+    memory: "20G"
+    linecard_types: ['8102-64H']
+    linux_username: admin
+    linux_password: password
+    mgmt_gateway_ip: "192.168.123.1"
+    linux_config: |
+        ip addr add dev eth4 192.168.123.4/24
+        ip link set dev eth4 up
+    xr_config: |
+        sudo config interface ip add eth0 MGMT_IP/MGMT_MASK MGMT_GATEWAY
+        sudo config save -y
+        SONIC_COMMANDS
+    custom_mgmt_inf: True
+    console_ports: [60004, 60005]
+
+  spine01:
+    platform: spitfire_f
+    os_type: sonic
+    image: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/onie-recovery-x86_64-cisco_8000-r0.iso
+    onie-install: /home/cisco/images/8000-eft17.0/packages/images/8000/sonic/sonic-cisco-8000.bin
+    memory: "20G"
+    linecard_types: ['8102-64H']
+    linux_username: admin
+    linux_password: password
+    mgmt_gateway_ip: "192.168.123.1"
+    linux_config: |
+        ip addr add dev eth4 192.168.123.5/24
+        ip link set dev eth4 up
+    xr_config: |
+        sudo config interface ip add eth0 MGMT_IP/MGMT_MASK MGMT_GATEWAY
+        sudo config save -y
+        SONIC_COMMANDS
+    custom_mgmt_inf: True 
+    console_ports: [60006, 60007]
+
+connections:
+
+    hubs:
+      l00s00:         
+        - leaf00.Ethernet0
+        - spine00.Ethernet0
+
+      l00s01:         
+        - leaf00.Ethernet4
+        - spine01.Ethernet0
+
+      l01s00:         
+        - leaf01.Ethernet0
+        - spine00.Ethernet4
+
+      l01s01:         
+        - leaf01.Ethernet4
+        - spine01.Ethernet4
+
+    custom:
+        mgmt:
+            ports: [leaf00.eth0, leaf01.eth0, spine00.eth0, spine01.eth0]
+            linux_bridge: mgmt_br
+            connection_type: tap
