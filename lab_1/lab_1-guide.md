@@ -12,7 +12,7 @@ https://containerlab.dev/
   - [Contents](#contents)
   - [Lab Objectives](#lab-objectives)
   - [Topology](#topology)
-  - [VXR Ovewview](#vxr-overview)
+  - [VXR Overview](#vxr-overview)
   - [Image Management](#image-management)
   - [System Verification](#platform-and-sonic-software-verification)
   - [Basic SONiC Configuration](#basic-sonic-configuration)
