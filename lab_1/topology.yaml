@@ -16,6 +16,8 @@ topology:
       image: c8000-clab-sonic:94
       binds: 
           - /opt/cisco/images:/images
+          - ./config/leaf-01/config_db.json:/etc/sonic/config_db.json
+
       env:
           IMAGE: /opt/cisco/images/sonic-cisco-8000.bin
           PID: '8101-32FH'
@@ -26,6 +28,7 @@ topology:
       image: c8000-clab-sonic:94
       binds: 
           - /opt/cisco/images:/images
+          - ./config/leaf-02/config_db.json:/etc/sonic/config_db.json
       env:
           IMAGE: /opt/cisco/images/sonic-cisco-8000.bin
           PID: '8101-32FH'
@@ -36,6 +39,7 @@ topology:
       image: c8000-clab-sonic:94
       binds: 
           - /opt/cisco/images:/images
+          - ./config/leaf-03/config_db.json:/etc/sonic/config_db.json
       env:
           IMAGE: /opt/cisco/images/sonic-cisco-8000.bin
           PID: '8101-32FH'
@@ -46,6 +50,7 @@ topology:
       image: c8000-clab-sonic:94
       binds: 
           - /opt/cisco/images:/images
+          - ./config/spine-01/config_db.json:/etc/sonic/config_db.json
       env:
           IMAGE: /opt/cisco/images/sonic-cisco-8000.bin
           PID: '8101-32FH'

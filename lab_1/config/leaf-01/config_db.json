@@ -4,7 +4,7 @@
             "mac": "02:42:ac:14:06:64",
             "switch_type": "switch",
             "buffer_model": "traditional",
-            "hostname": "leaf00",
+            "hostname": "leaf-01",
             "bgp_asn": "65001",
             "docker_routing_config_mode": "split"
         }
@@ -12,17 +12,15 @@
     
     "LOOPBACK_INTERFACE": {
         "Loopback0": {},
-        "Loopback0|10.0.0.2/32": {},
-        "Loopback0|fc00:0:1002::1/128": {}
+        "Loopback0|1.1.1.1/32": {},
+        "Loopback0|fc00:0:1::1/128": {}
     },
 
     "INTERFACE": {
         "Ethernet0": {},
-        "Ethernet0|10.1.1.1/31": {},
-        "Ethernet0|2001:db8:1:1::1/127": {},
-        "Ethernet8": {},
-        "Ethernet8|10.1.1.5/31": {},
-        "Ethernet8|2001:db8:1:1::5/127": {}
+        "Ethernet0|10.1.1.0/31": {},
+        "Ethernet0|2001:db8:1:1::0/127": {},
+        "Ethernet8": {}
     },
     "PORT": {
         "Ethernet0": {
