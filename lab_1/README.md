@@ -1,31 +1,31 @@
 ## Cisco SONiC 8101-32FH-O Emulator running on Containerlab
 
-This folder covers the *`8101-32FH-O`* 
-
 Requirements:
 * Ubuntu 22.04 or 24.04  
-* **4 vCPU, 10G memory per node** 
-* Containerlab (tested using 0.74.2)
+* **4 vCPU, minimum 10G memory per node** 
+* Containerlab (tested using 0.74.3)
 * docker, kvm
-* Dockerized Cisco 8101 emulator image: *`c8000-clab-sonic:92`*
+* Dockerized Cisco 8101 emulator image: *`c8000-clab-sonic:94`*
 
 
-1. clone the repo, cd into *`cisco8000e/sonic-clab/c8101/`*
+1. clone the repo
 ```
 git clone https://github.com/brmcdoug/cisco8000e.git
 ```
+
+2. cd into *`./SONiC/lab_1/`*
 ```
-cd cisco8000e/sonic-clab/c8101/
+cd ./SONiC/lab_1/
 ```
 
-2. Optional - edit the topology yaml as needed [topology.yaml](./topology.yaml)
+3. Optional - edit the topology yaml as needed [topology.yaml](./topology.yaml)
 
-3. Deploy the topology
+4. Deploy the topology
 ```
 clab deploy -t topology.yaml
 ```
 
->[Note] it takes the 8000 emulator nodes several minutes to come up. Monitor their progress with *`docker logs -f node-name`*. Routers are ready when logs reach a point that says something like:
+>[Note] it takes the 8000 emulator nodes several minutes to come up. Monitor their progress with 'docker logs' command. Example: *`docker logs -f leaf-01`*. Routers are ready when logs reach a point that says something like:
 
 ```
 19:59:50 INFO Sim up
