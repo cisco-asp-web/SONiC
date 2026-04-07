@@ -1,4 +1,4 @@
-# Lab 1 Guide: Learn VXR Overview, Image Management, Configuration Management [100 Min]
+# Lab 1 Guide: Learn Cisco 8000 Emulator, Image Management, Configuration Management [100 Min]
 
 We use containerlab to orchestrate the VXR and SONiC virtual network topologies. 
 
@@ -12,7 +12,7 @@ https://containerlab.dev/
   - [Contents](#contents)
   - [Lab Objectives](#lab-objectives)
   - [Topology](#topology)
-  - [VXR Overview](#vxr-overview)
+  - [Cisco 8000 Emulator Overview](#cisco-8000-emulator-overview)
   - [Image Management](#image-management)
   - [System Verification](#platform-and-sonic-software-verification)
   - [Basic SONiC Configuration](#basic-sonic-configuration)
@@ -36,7 +36,7 @@ For Labs 1-6 you will be using a single topology as outlined below. We will have
 <img src="../drawings/topology-base-view.png" width="800" />
 
 
-## VXR Overview
+## Cisco 8000 Emulator Overview
 
 The Cisco 8000 Hardware Emulator portfolio (referred to as 8000e) provides one for one equivalent simulation of the 8xxx Series routers. The 8000e provides both accurate hardware profile and forwarding engine emulation. This enables 8000e to run the same productio IOS-XR images as hardware. Secondly, it can run third party Operating Systems such as SONIC which have been ported to the 8000 series routers. For this lab we will be using the VXR option to load the SONiC NOS
 
