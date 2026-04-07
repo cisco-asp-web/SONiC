@@ -40,6 +40,11 @@ For Labs 1-6 you will be using a single topology as outlined below. We will have
 
 The Cisco 8000 Hardware Emulator portfolio (referred to as 8000e) provides one for one equivalent simulation of the 8xxx Series routers. The 8000e provides both accurate hardware profile and forwarding engine emulation. This enables 8000e to run the same productio IOS-XR images as hardware. Secondly, it can run third party Operating Systems such as SONIC which have been ported to the 8000 series routers. For this lab we will be using the VXR option to load the SONiC NOS
 
+There are a few limitations on the 8000 emulator to be aware of:
+- Traffic shapping and rate limiting: Functionality is limited
+- Data Throughput: Though we have a data plane it is the thousands of pps
+- Counters: Not all counters are supported
+
 ## Image Management
 
 ### SONiC Installation on Cisco 8000
