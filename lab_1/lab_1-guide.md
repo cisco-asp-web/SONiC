@@ -220,15 +220,14 @@ sudo config interface ip add Loopback0 INTERFACE_IPv6/MASK
 ### Configuring VRF 
 ```
 sudo config vrf add VRF_NAME​
-sudo config interface vrf bind VlanX VRF_NAME​
-sudo config vrf add_vrf_vni_map VRF_NAME VNI_NUMBER
+sudo config interface vrf bind INTERFACE_NAME VRF_NAME​
+sudo config vrf add_vrf_vni_map VRF_NAME VNI_NUMBER (???)
 ```
 ### Configuring VLAN
 ```
-sudo config vxlan add VTEP_NAME VTEP_SOURCE_IP​
-sudo config vxlan map add VTEP_NAME VLAN_NUMBER VNI_NUMBER​
-sudo config vxlan evpn_nvo add NVO VTEP_NAME ​
-sudo config vlan static-anycast-gateway enable VLAN_NUMBER
+sudo config vlan add VLAN_NUMBER​
+sudo config interface ip add VLAN_NUMBER VLAN_IP​
+sudo config vlan member add VLAN_NUMBER INTERFACE
 ```
 ### Configuring Port Channels
 1. Create Port Channels to *sonic-rtr-spine-1* and *sonic-rtr-spine-2*
