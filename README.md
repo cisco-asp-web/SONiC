@@ -10,7 +10,7 @@ The lab software stack is built off the SONiC master build with Cisco specific p
 
 ## Contents
 * Lab Topology (TBD)
-* Lab 1 - Intro to VXR, Image Management, Config Management [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_1/lab_1-guide.md)
+* Lab 1 - Intro to Cisco 8000 Emulator, Image Management, Config Management [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_1/lab_1-guide.md)
 * Lab 2 - SONiC and FRR, Building a BGP Fabric [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_2/lab_2-guide.md)
 * Lab 3 - SONiC Automation on Cisco 8000 [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_3/lab_3-guide.md)
 * Lab 4 - SONiC ACL, CoPP, and Packet Mirroring [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_4/lab_4-guide.md)
