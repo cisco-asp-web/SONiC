@@ -15,8 +15,8 @@ https://containerlab.dev/
   - [Cisco 8000 Emulator Overview](#cisco-8000-emulator-overview)
   - [Image Management](#image-management)
   - [System Verification](#platform-and-sonic-software-verification)
-  - [Basic SONiC Configuration](#basic-sonic-configuration)
   - [Configuration Management](#configuration-management)
+  - [Basic SONiC Configuration](#basic-sonic-configuration)
   - [End of Lab 1](#end-of-lab-1)
   
 ## Lab Objectives
@@ -66,7 +66,8 @@ There are a few limitations on the 8000 emulator to be aware of:
 
 ### Platform and Software Health Checks
 
-## Basic SONiC Configuration
+## Configuration Management
+
 ### Managing Configurations
 Configuration state in SONiC is saved in two separate locations. For persistant configuration between reloads configuration files are used. The main configuration is found at */etc/sonic/config_db.json*. The second configuration file in this lab is for the FRR routing stack and it's configuration is found at */etc/sonic/frr/bgpd.conf*. 
 
@@ -180,6 +181,14 @@ For direct FRR configuration you use the *vtysh* command which drops you into th
 vtysh
 copy run start
 ```
+
+## Basic SONiC Configuration
+- [Configuring Hostname](#configuring-hostname)
+- [Configuring Users](#configuring-users)
+- [Configuring Interface IPv4 and IPv6](#configuring-interface-ipv4-ipv6)
+- [Configuring Loopback Interface](#configuring-loopback-interface)
+- [Configure VLAN](#configure-vlan)
+  
 ### Configuring Hostname
 
 ### Configuring Users
@@ -188,9 +197,9 @@ copy run start
 
 ### Configuring Loopback Interface
 
-### Configuring VLAN 
+### Configuring VRF 
 
-## Configuration Management
+### Configuring VLAN
 
 ### REDIS Database queries and verification of config
 ## End of Lab 1
