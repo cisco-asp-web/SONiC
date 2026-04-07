@@ -86,7 +86,7 @@ config load [-y|--yes] [<filename>]
 ```
 - Example:
 ```
-cisco@spine-01-1:~$ sudo config load
+cisco@spine-01:~$ sudo config load
 Load config from the file /etc/sonic/config_db.json? [y/N]: y
 Running command: /usr/local/bin/sonic-cfggen -j /etc/sonic/config_db.json --write-to-db
 ```
@@ -105,7 +105,7 @@ config reload [-y|--yes] [-l|--load-sysinfo] [<filename>] [-n|--no-service-resta
 ```
 - Example:
 ```
-cisco@spine-01-1~$ sudo config reload
+cisco@spine-01~$ sudo config reload
 Clear current config and reload config from the file /etc/sonic/config_db.json? [y/N]: y
 Running command: systemctl stop dhcp_relay
 Running command: systemctl stop swss
@@ -136,19 +136,19 @@ config save [-y|--yes] [<filename>]
 - Example (Save configuration to /etc/sonic/config_db.json):
 
 ```
-cisco@spine-01-1:~$ sudo config save -y
+cisco@spine-01:~$ sudo config save -y
 ```
 
 - Example (Save configuration to a specified file):
 ```
-cisco@spine-01-1:~$ sudo config save -y /etc/sonic/config2.json
+cisco@spine-01:~$ sudo config save -y /etc/sonic/config2.json
 ```
 
 #### Edit Configuration Through CLI
 
 Configuration management is also possible through the SONiC CLI. From the SONiC command prompt enter *config* and the command syntax needed. 
 ```
-cisco@sonic-rtr-leaf-1:~$ config -?
+cisco@spine-01:~$ config -?
 Usage: config [OPTIONS] COMMAND [ARGS]...
 
   SONiC command line - 'config' command
