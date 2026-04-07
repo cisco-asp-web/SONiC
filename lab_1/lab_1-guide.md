@@ -72,7 +72,8 @@ Configuration state in SONiC is saved in two separate locations. For persistant 
 
 When the router boots it loads the configuration from these two files into the redis database. The redis database is the running configuration of the router where the various services read or write state information into the redis database.
 
-![redis diagram](./topo-drawings/redis-diagram.png)
+
+<img src="../drawings/redis-diagram.png" width="800" />
 
 #### Loading configuration from JSON file
 
