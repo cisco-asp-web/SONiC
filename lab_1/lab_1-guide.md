@@ -17,6 +17,7 @@ https://containerlab.dev/
   - [System Verification](#platform-and-sonic-software-verification)
   - [Configuration Management](#configuration-management)
   - [Basic SONiC Configuration](#basic-sonic-configuration)
+  - [Configuring SONiC Leaf-03](#configuring-sonic-leaf-03)
   - [End of Lab 1](#end-of-lab-1)
   
 ## Lab Objectives
@@ -182,24 +183,60 @@ copy run start
 ```
 
 ## Basic SONiC Configuration
+The following configuration snippets are examples of basic router configuration using CLI all hyperscalers perform configuration management through the use of config_db changes which are then loaded into Redis database. The CLI commands here are linux commands and not executed through the *vtysh* shell.
+
 - [Configuring Hostname](#configuring-hostname)
 - [Configuring Users](#configuring-users)
 - [Configuring Interface IPv4 and IPv6](#configuring-interface-ipv4-ipv6)
 - [Configuring Loopback Interface](#configuring-loopback-interface)
 - [Configure VLAN](#configure-vlan)
+- [Configuring Port Channels](#configuring-port-channels)
   
 ### Configuring Hostname
-
+```
+sudo config hostname HOSTNAME ​
+```
 ### Configuring Users
 
 ### Configuring Interface IPv4 and IPv6
-
+```
+sudo config interface ip add INTERFACE_NAME INTERFACE_IPv4/MASK ​
+sudo config interface ip add INTERFACE_NAME INTERFACE_IPv6/MASK
+```
 ### Configuring Loopback Interface
 
 ### Configuring VRF 
-
+```
+sudo config vrf add VRF_NAME​
+sudo config interface vrf bind VlanX VRF_NAME​
+sudo config vrf add_vrf_vni_map VRF_NAME VNI_NUMBER
+```
 ### Configuring VLAN
+```
+sudo config vxlan add VTEP_NAME VTEP_SOURCE_IP​
+sudo config vxlan map add VTEP_NAME VLAN_NUMBER VNI_NUMBER​
+sudo config vxlan evpn_nvo add NVO VTEP_NAME ​
+sudo config vlan static-anycast-gateway enable VLAN_NUMBER
+```
+### Configuring Port Channels
+1. Create Port Channels to *sonic-rtr-spine-1* and *sonic-rtr-spine-2*
+   ```
+   sudo config portchannel add PortChannel1
+   ```
+2.  Configure Port Channel interface members
+    ```
+    sudo config portchannel member add PortChannel1 Ethernet0
+    sudo config portchannel member add PortChannel1 Ethernet4
+    ```
+3. Configure Port Channel IPs
+   ```
+   sudo config interface ip add PortChannel1 INTERFACE_IPv4/MASK
+   ```
+
+## Configuring SONiC Leaf-03
 
 ### REDIS Database queries and verification of config
+
+
 ## End of Lab 1
 Lab 1 is completed, please proceed to [Lab 2](https://github.com/cisco-asp-web/SONiC/blob/main/lab_2/lab_2-guide.md)
