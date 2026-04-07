@@ -160,8 +160,6 @@ FRR is an open-source routing stack that supports multiple protocols. In this la
 
 First FRR stores it's configuration in a separate file located at */etc/sonic/frr/bgpd.conf*. There are different methods to manage the configuration for FRR.
 
-
-![FRR Configuration Overview](./topo-drawings/frr-bgp-framework.png)
 <img src="../drawings/frr-bgp-framework.png" width="800" />
 
 We can view FRR's BGP configuration from the SONiC CLI itself
