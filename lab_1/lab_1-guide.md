@@ -162,6 +162,7 @@ First FRR stores it's configuration in a separate file located at */etc/sonic/fr
 
 
 ![FRR Configuration Overview](./topo-drawings/frr-bgp-framework.png)
+<img src="../drawings/frr-bgp-framework.png" width="800" />
 
 We can view FRR's BGP configuration from the SONiC CLI itself
 
