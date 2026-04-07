@@ -197,6 +197,14 @@ The following configuration snippets are examples of basic router configuration 
 sudo config hostname HOSTNAME ​
 ```
 ### Configuring Users
+Creates the home directory (/home/username) and sets up default settings​
+```
+sudo adduser username​
+```
+Set the created user with superuser admin rights
+```
+sudo usermod -aG sudo username
+```
 
 ### Configuring Interface IPv4 and IPv6
 ```
@@ -204,6 +212,10 @@ sudo config interface ip add INTERFACE_NAME INTERFACE_IPv4/MASK ​
 sudo config interface ip add INTERFACE_NAME INTERFACE_IPv6/MASK
 ```
 ### Configuring Loopback Interface
+```
+sudo config interface ip add Loopback0 INTERFACE_IPv4/MASK
+sudo config interface ip add Loopback0 INTERFACE_IPv6/MASK
+```
 
 ### Configuring VRF 
 ```
