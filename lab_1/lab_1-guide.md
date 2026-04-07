@@ -33,7 +33,7 @@ We will have achieved the following objectives upon completion of Lab 1:
 
 For Labs 1-6 you will be using a single topology as outlined below. We will have four SONiC routers running in a two tier fabric with host containers connected to each leaf. 
 
-![Lab Topology](../drawings/topology-base-view.png)
+![Lab Topology](../drawings/topology-base-view.png width="800")
 
 
 ## VXR Overview
