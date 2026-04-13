@@ -9,14 +9,19 @@ Though it is easy to run SONiC in a virtualized lab environment, this lab brings
 The lab software stack is built off the SONiC master build with Cisco specific platform drivers for the Cisco 8000 hardware.
 
 ## Contents
+### SONiC Workshop #1
 * Lab Topology (TBD)
 * Lab 1 - Intro to Cisco 8000 Emulator, Image Management, Config Management [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_1/lab_1-guide.md)
 * Lab 2 - SONiC and FRR, Building a BGP Fabric [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_2/lab_2-guide.md)
 * Lab 3 - SONiC Automation on Cisco 8000 [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_3/lab_3-guide.md)
 * Lab 4 - SONiC ACL, CoPP, and Packet Mirroring [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_4/lab_4-guide.md)
+
+### SONiC Workshop #2
 * Lab 5 - SONiC and FRR, Building a VXLAN EVPN Fabric [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_5/lab_5-guide.md)
 * Lab 6 - SONiC Building an AI Backend Network on Cisco 8000 [LINK](https://github.com/cisco-asp-web/SONiC/blob/main/lab_6/lab_6-guide.md)
-
+* Lab 7 - SONiC and troubleshooting optical transceivers
+* Lab 8 - SONiC Advanced Health Checks and Troubleshooting
+  
 ## Github Repository Overview
 Each of the labs is designed to be completed in the order presented.
 
