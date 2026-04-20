@@ -557,7 +557,7 @@ Ethernet252      532,533,534,535     100G   9100    N/A    etp63  routed      up
 
 This device has 64x 100GE ports (Ethernet0 through Ethernet252, in steps of 4). Note the `Alias` column — `etp0` through `etp63` are the front-panel port labels. The default MTU is 9100 (jumbo frames) and all ports default to `routed` mode.
 
->[Note] EthernetX port numbering and counts depend on hardware SKU. For example the 8122-64EH-O platform is numbered in steps of 8
+>\* **Note:** EthernetX port numbering and counts depend on hardware SKU. For example the 8122-64EH-O platform is numbered in steps of 8
 
 ---
 
@@ -577,6 +577,7 @@ sudo config vrf add <vrf-name>
 ```
 
 Changes take effect instantly but are **not saved to disk** until you run `sudo config save -y`.
+
 
 <img src="../drawings/redis-diagram.png" width="800" />
 
@@ -647,19 +648,23 @@ SONiC supports several reboot strategies with different trade-offs:
 
 This lab uses **vXR** (Cisco 8000 Emulator), which runs the same `docker-syncd-cisco` container and SDK as real hardware. Platform-specific commands like `show platform inventory` and `show platform temperature` work identically to production.
 
+Other virtualized SONiC options include:
+
 | Option | Dataplane | Fidelity | Use Case |
 |--------|-----------|----------|----------|
 | **SONiC-VS** | Linux kernel forwarding | Low | Basic CI/CD testing, control plane dev |
 | **SONiC VPP** | VPP (Vector Packet Processing) | Medium | Functional testing without hardware |
 | **vXR** | Emulated Cisco 8000 ASIC via SDK | High | Full-fidelity lab that mirrors production |
 
-Orchestration options:
+Topology orchestration options:
 
 | Tool | Description |
 |------|-------------|
 | **pyvxr** | Python library for programmatic vXR topology management |
 | **containerlab** | Open-source tool for container-based network labs |
 | **CML (Cisco Modeling Labs)** | GUI-driven lab platform with vXR support |
+
+> \* **Note:**: containerlab can also support sonic-vs kvm images with the help of a conversion tool called vrnetlab. If interested ask instructors for details.
 
 ---
 
@@ -1483,4 +1488,4 @@ Lab 1 is complete. You have:
 - Configured MTU, VRFs (create, bind, unbind, delete), static routes, NTP, and syslog
 - Queried REDIS directly and saved configuration
 
-Proceed to **Lab 2 (Underlay BGP)** to configure eBGP routing between the leaves and spine.
+Proceed to [**Lab 2 (Underlay BGP)**](../lab_2/lab_2-guide.md) to configure eBGP routing between the leaves and spine.
