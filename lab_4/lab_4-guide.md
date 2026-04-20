@@ -935,20 +935,6 @@ If **`state`** is not **`ok`**, use **Troubleshooting** (below) before signing o
 
 ---
 
-### Verification Step 6 — (Out of scope for read-only run) Policy change workflow
-
-**Why:** Live networks sometimes require **raising** policer headroom (for example sustained BGP update volume) or **splitting** trap groups. **Wrong** CoPP changes can **starve** **LACP**, **BGP**, or **ARP**—this step is **not** part of read-only verification; it belongs in a **change record** with rollback.
-
-High-level patterns (follow your **release documentation** and **Cisco SONiC** operational guide for **`config`** / **CONFIG_DB**):
-
-1. Model changes in **CONFIG_DB** (or the supported **`config`** CoPP path for your branch), not only by editing **`copp_cfg.json`** on disk unless your process explicitly merges seed files on boot.
-2. Apply via **`config load`** / **`config reload`** (or vendor-approved procedure); expect **SWSS** / **syncd** interaction and possible **brief** control-plane risk.
-3. **Re-run Verification Steps 1–5** and **protocol-level** validation (BGP sessions, LACP neighbors, ARP/ND completeness).
-
-Editing **`/etc/sonic/copp_cfg.json`** alone **does not** reliably alter runtime policy on most images; assume **reload** or **swss** restart until proven otherwise for your build.
-
----
-
 ### Troubleshooting (short)
 
 | Symptom | Checks |
