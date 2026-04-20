@@ -20,7 +20,9 @@ Your instructor will give you the following at the start of the session:
 
 ## Step 1 — Connect to Your Container
 
-You have a personal Linux container running on the lab server and which you'll use as a jumphost to reach your SONiC nodes. Connect to it using SSH from your laptop:
+You have a personal Linux container running on the lab server and which you'll use as a jumphost to reach your SONiC nodes. 
+
+Connect to it using SSH from your laptop:
 
 ```bash
 ssh -p <YOUR_PORT> <YOUR_USERNAME>@10.29.209.5
@@ -125,3 +127,5 @@ Device password: **`password`**
 
 Raise your hand or message the instructor in the chat. Don't struggle
 silently — we're here to help!
+
+**Please proceed to Lab_1**: [LINK](../lab_1/lab_1-guide.md)
