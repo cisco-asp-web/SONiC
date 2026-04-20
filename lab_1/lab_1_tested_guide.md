@@ -13,29 +13,54 @@ This lab introduces the SONiC (Software for Open Networking in the Cloud) networ
 
 ## Table of Contents
 
-1. [Lab Objectives](#lab-objectives)
-2. [Task 1 — SONiC Hello World](#task-1--sonic-hello-world)
-   - [1.1 Login Banner & First Look](#11-login-banner--first-look)
-   - [1.2 Versions & Image Management](#12-versions--image-management)
-   - [1.3 Platform Hardware](#13-platform-hardware)
-   - [1.4 Docker Containers & Services](#14-docker-containers--services)
-   - [1.5 Configuration Methods](#15-configuration-methods)
-   - [1.6 Reboot Mechanisms](#16-reboot-mechanisms)
-   - [1.7 vXR Emulation Brief](#17-vxr-emulation-brief)
-3. [Task 2 — Basic Configuration Circuit](#task-2--basic-configuration-circuit)
-   - [2.1 Configuring Users](#21-configuring-users)
-   - [2.2 Configuring Interface IPv4](#22-configuring-interface-ipv4)
-   - [2.3 Configuring Loopback Interface](#23-configuring-loopback-interface)
-   - [2.4 Configuring VLANs](#24-configuring-vlans)
-   - [2.5 VLAN SVI (Switched Virtual Interface)](#25-vlan-svi-switched-virtual-interface)
-   - [2.6 PortChannel (LACP)](#26-portchannel-lacp)
-   - [2.7 Configuring MTU](#27-configuring-mtu)
-   - [2.8 VRF Configuration](#28-vrf-configuration)
-   - [2.9 Static Routes](#29-static-routes)
-   - [2.10 NTP Configuration](#210-ntp-configuration)
-   - [2.11 Syslog Configuration](#211-syslog-configuration)
-   - [2.12 Configuration Management](#212-configuration-management)
-4. [End of Lab 1](#end-of-lab-1)
+- [Introduction to SONiC \& SONiC Configuration](#introduction-to-sonic--sonic-configuration)
+  - [Lab 1 — 3-Leaf / 1-Spine](#lab-1--3-leaf--1-spine)
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
+  - [Lab Objectives](#lab-objectives)
+  - [Topology](#topology)
+  - [Task 1 — SONiC Hello World](#task-1--sonic-hello-world)
+    - [1.1 Login Banner \& First Look](#11-login-banner--first-look)
+    - [1.2 Versions \& Image Management](#12-versions--image-management)
+    - [1.3 Platform Hardware](#13-platform-hardware)
+    - [1.4 Docker Containers \& Services](#14-docker-containers--services)
+    - [1.5 Configuration Methods](#15-configuration-methods)
+      - [1.5.1 CLI (`sudo config`)](#151-cli-sudo-config)
+      - [1.5.2 JSON (`config_db.json`)](#152-json-config_dbjson)
+      - [1.5.3 FRR (vtysh)](#153-frr-vtysh)
+    - [1.6 Reboot Mechanisms](#16-reboot-mechanisms)
+    - [1.7 vXR Emulation Brief](#17-vxr-emulation-brief)
+  - [Task 2 — Basic Configuration Circuit](#task-2--basic-configuration-circuit)
+    - [2.1 Configuring Users](#21-configuring-users)
+    - [2.2 Configuring Interface IPv4](#22-configuring-interface-ipv4)
+    - [2.3 Configuring Loopback Interface](#23-configuring-loopback-interface)
+    - [2.4 Configuring VLANs](#24-configuring-vlans)
+      - [Access Port (Untagged)](#access-port-untagged)
+      - [Trunk Port (Tagged)](#trunk-port-tagged)
+      - [Cleanup (reference)](#cleanup-reference)
+    - [2.5 VLAN SVI (Switched Virtual Interface)](#25-vlan-svi-switched-virtual-interface)
+    - [2.6 PortChannel (LACP)](#26-portchannel-lacp)
+    - [2.7 Configuring MTU](#27-configuring-mtu)
+    - [2.8 VRF Configuration](#28-vrf-configuration)
+      - [Create VRFs](#create-vrfs)
+      - [Bind Interfaces to a VRF](#bind-interfaces-to-a-vrf)
+      - [Unbind an Interface](#unbind-an-interface)
+      - [Delete a VRF](#delete-a-vrf)
+    - [2.9 Static Routes](#29-static-routes)
+    - [2.10 NTP Configuration](#210-ntp-configuration)
+    - [2.11 Syslog Configuration](#211-syslog-configuration)
+    - [2.12 Configuration Management](#212-configuration-management)
+      - [Running vs Startup Configuration](#running-vs-startup-configuration)
+      - [config save — Running to Disk](#config-save--running-to-disk)
+      - [config load — Merge JSON into Running](#config-load--merge-json-into-running)
+      - [config reload — Full Replace (Day 0 / Config Replace)](#config-reload--full-replace-day-0--config-replace)
+      - [config apply-patch — Surgical JSON Patch](#config-apply-patch--surgical-json-patch)
+      - [Summary](#summary)
+      - [FRR Configuration Persistence](#frr-configuration-persistence)
+      - [A Primer on REDIS Commands](#a-primer-on-redis-commands)
+      - [REDIS Database IDs](#redis-database-ids)
+      - [Querying CONFIG\_DB](#querying-config_db)
+  - [End of Lab 1](#end-of-lab-1)
 
 ---
 
@@ -54,6 +79,13 @@ By completing this lab you will be able to:
 - [ ] Save, load, and reload configuration; query the REDIS database directly
 
 ---
+
+## Topology
+
+For Labs 1-6 you will be using a single topology as outlined below. We will have four SONiC routers running in a two tier fabric with host containers connected to each leaf. 
+
+<img src="../drawings/topology-base-view.png" width="800" />
+
 
 ## Task 1 — SONiC Hello World
 
@@ -85,7 +117,7 @@ Help:    https://sonic-net.github.io/SONiC/
 
 SONiC is a full Linux distribution — you have `bash`, `apt`, `python3`, `docker`, and all standard Linux utilities alongside the SONiC CLI.
 
-**Run** — Check what CLI commands are available:
+**Run** — Check what *SONiC* CLI commands are available:
 
 ```bash
 show --help
