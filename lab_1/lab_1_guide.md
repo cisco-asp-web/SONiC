@@ -250,13 +250,13 @@ show platform inventory
 ```
 
 ```
-    Name                Product ID      Version              Serial Number   Description
+    Name                Product ID      Version        Serial Number   Description
 
 Chassis
-    CHASSIS             8102-64H-O      0.20                 CSNDPBZWVPL     Cisco 8102 2RU System with SONiC and 64x100GE QSFP28
+    CHASSIS             8102-64H-O      0.20           CSNDPBZWVPL     Cisco 8102 2RU System with SONiC and 64x100GE QSFP28
 
 Route Processors
-    RP                  8102-64H-O      0.20                 PCBDPBZWVPN     Cisco 8102 2RU System with SONiC and 64x100GE QSFP28
+    RP                  8102-64H-O      0.20           PCBDPBZWVPN     Cisco 8102 2RU System with SONiC and 64x100GE QSFP28
 
 Power Supplies
     psutray
@@ -269,8 +269,8 @@ Cooling Devices
     fantray2 -- not present
 
 FPDs
-    RP/iofpga                           0.1.1-0                              IOFPGA
-    RP/valentine                        0.24.0-0                             VALENTINE
+    RP/iofpga                           0.1.1-0                        IOFPGA
+    RP/valentine                        0.24.0-0                       VALENTINE
 ```
 
 > PSUs and fans show "not present" because this is a vXR emulated device. On physical hardware, you would see model numbers, serial numbers, voltage/current readings, and fan speeds.
@@ -557,6 +557,8 @@ Ethernet252      532,533,534,535     100G   9100    N/A    etp63  routed      up
 
 This device has 64x 100GE ports (Ethernet0 through Ethernet252, in steps of 4). Note the `Alias` column — `etp0` through `etp63` are the front-panel port labels. The default MTU is 9100 (jumbo frames) and all ports default to `routed` mode.
 
+>[Note] EthernetX port numbering and counts depend on hardware SKU. For example the 8122-64EH-O platform is numbered in steps of 8
+
 ---
 
 ### 1.5 Configuration Methods
@@ -575,6 +577,8 @@ sudo config vrf add <vrf-name>
 ```
 
 Changes take effect instantly but are **not saved to disk** until you run `sudo config save -y`.
+
+<img src="../drawings/redis-diagram.png" width="800" />
 
 #### 1.5.2 JSON (`config_db.json`)
 

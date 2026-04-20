@@ -73,9 +73,6 @@ ssh leaf1
 # Once inside SONiC — check the version
 show version
 
-# show platform to see which kind of device you're running
-show platform summary
-
 # Check interface status
 show interfaces status
 

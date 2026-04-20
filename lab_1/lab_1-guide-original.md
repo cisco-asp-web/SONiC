@@ -28,11 +28,6 @@
 ### Reference Commands
 
 
-## System Verification 
-
-### Platform and SONiC Software Verification
-
-### Container Verification
 
 ### Platform and Software Health Checks
 
