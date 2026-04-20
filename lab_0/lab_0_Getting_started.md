@@ -20,8 +20,7 @@ Your instructor will give you the following at the start of the session:
 
 ## Step 1 — Connect to Your Container
 
-You have a personal Linux container running on the lab server. Connect to it
-using SSH from your laptop:
+You have a personal Linux container running on the lab server and which you'll use as a jumphost to reach your SONiC nodes. Connect to it using SSH from your laptop:
 
 ```bash
 ssh -p <YOUR_PORT> <YOUR_USERNAME>@10.29.209.5
@@ -72,6 +71,9 @@ ssh leaf1
 # Once inside SONiC — check the version
 show version
 
+# show platform to see which kind of device you're running
+show platform summary
+
 # Check interface status
 show interfaces status
 
@@ -106,6 +108,16 @@ Device password: **`password`**
 **Ansible returns `unreachable`?**
 - Same as above — device may not be ready yet.
 - Check `~/lab/ansible/inventory.ini` to confirm the IPs look correct.
+
+```bash
+        [leaves]
+        podN-leaf1  ansible_host=192.168.122.36
+        podN-leaf2  ansible_host=192.168.122.37
+        podN-leaf3  ansible_host=192.168.122.38
+
+        [spines]
+        podN-spine4  ansible_host=192.168.122.39
+```
 
 ---
 
