@@ -9,7 +9,7 @@
 | **1** | **L3-type** ingress ACL on **Ethernet0** — **`IP_PROTOCOL`**, **`L4_DST_PORT`**, **`PACKET_ACTION`** | **`acl_L4.json`**, **`show acl`**, **`aclshow`**, **`counterpoll`**, **`sudo show platform npu acl`**, optional **Redis** **`ACL_RULE`** |
 | **2** | CoPP path from **seed** to **STATE_DB** | **`copp_cfg.json`**, **swss** / **orchagent** / **coppmgrd**, **APPL_DB** **`COPP_TABLE`**, **`swss.rec`**, **`COPP_GROUP_TABLE`** |
 
-> **Persistence** — After **`config load`**, lab **`ACL_TABLE`** / **`ACL_RULE`** usually land in **`/etc/sonic/config_db.json`** and survive **`config reload`** / **reboot** until removed (**`vi`**, **`config`**, or approved tooling). Clear **`ACL_DENY`** before **Exercise 2** or **handoff** so **Ethernet0** HTTP and CoPP baselines stay trustworthy.
+> **Persistence** — After **`config load`**, lab **`ACL_TABLE`** / **`ACL_RULE`** usually land in **`/etc/sonic/config_db.json`** and survive **`config reload`** / **reboot** until removed (**`vi`**, **`config`**, or approved tooling). Plan ACL retirement in your environment if you must not keep **`ACL_DENY`** on **Ethernet0**.
 
 **Conventions:** Each exercise flows **objectives → prerequisites → commands → sample output → checklists**. Prompts show **`admin@…`**; use **`sudo`** where indicated.
 
@@ -33,13 +33,11 @@
 | Step | Phase | Outcome |
 |:---:|:---|:---|
 | **1** | **Exercise 1** | Baseline **HTTP** → **`config load`** **`acl_L4.json`** → verify CLI, counters, NPU (**Redis** optional) |
-| **2** | **ACL cleanup** | Remove lab **`ACL_DENY`** from **`/etc/sonic/config_db.json`** → **`sudo config reload -y`** (runbook; not fully scripted here) |
-| **3** | **Exercise 2** | CoPP **Verification Steps 1–5** (read-only): **`copp_cfg.json`**, **swss**, **APPL_DB**, **`swss.rec`**, **STATE_DB** |
+| **2** | **Exercise 2** | CoPP **Verification Steps 1–5** (read-only): **`copp_cfg.json`**, **swss**, **APPL_DB**, **`swss.rec`**, **STATE_DB** |
 
 ```mermaid
 flowchart LR
-  A["Exercise 1\nACL + HTTP lab"] --> B["ACL cleanup\nconfig_db.json"]
-  B --> C["Exercise 2\nCoPP verification"]
+  A["Exercise 1\nACL + HTTP lab"] --> C["Exercise 2\nCoPP verification"]
 ```
 
 ---
@@ -51,7 +49,7 @@ After this lab you should be able to:
 | # | Skill |
 |:-:|---------|
 | 1 | **ACL (Exercise 1):** Author **Config DB** JSON for an **L3-type** **INGRESS** ACL on a port using **`IP_PROTOCOL`**, **`L4_DST_PORT`**, and **`PACKET_ACTION`** (**FORWARD** / **DROP**); **`config load`**; validate with **`show acl`**, **`counterpoll`**, **`aclshow`**, and **`sudo show platform npu acl`**; interpret optional **Redis** **`ACL_RULE`** / **`ACL_RULE_TABLE`** keys. |
-| 2 | **ACL:** Prove **HTTP** is blocked while **ICMP** is forwarded; complete **Example 1** checklist **Close-out** (**`/etc/sonic/config_db.json`** + **`config reload`**) per your runbook (procedure not copy-pasted in this guide). |
+| 2 | **ACL:** Prove **HTTP** is blocked while **ICMP** is forwarded using **`show acl`**, **`aclshow`**, and **NPU** views. |
 | 3 | **CoPP (Exercise 2):** Explain **`copp_cfg.json`** (**`COPP_TRAP`** → **`COPP_GROUP`**); verify **swss** / **orchagent** / **coppmgrd**; read **APPL_DB** **`COPP_TABLE`**, **`swss.rec`**, and **STATE_DB** **`COPP_GROUP_TABLE`** against the seed. |
 
 ---
@@ -81,8 +79,7 @@ After this lab you should be able to:
 |:-------:|------|
 | **1** | On **Ethernet0** **INGRESS**: **`FORWARD`** ICMP (**`IP_PROTOCOL`** = **1**, any IPv4 **SRC/DST**); **`DROP`** TCP **dport 80** (**HTTP**). Prove in **`show acl`**, **`aclshow`** / **`counterpoll`**, **`sudo show platform npu acl`**, optional **Redis**. |
 
-> **Before `config load`** — On the ACL leaf: **`show acl table`** · **`show acl rule`**. If **`ACL_DENY`** (or any other ingress ACL on **Ethernet0**) exists, clear it via **your runbook** so **`acl_L4.json`** merges cleanly.  
-> **After Exercise 1** — Delete lab **`ACL_DENY`** **`ACL_TABLE`** / **`ACL_RULE`** from **`/etc/sonic/config_db.json`**, then **`sudo config reload -y`** (or equivalent) **before** **Exercise 2** or handoff.
+> **Before `config load`** — On the ACL leaf: **`show acl table`** · **`show acl rule`**. If **`ACL_DENY`** (or any other ingress ACL on **Ethernet0**) exists, clear it via **your runbook** so **`acl_L4.json`** merges cleanly.
 
 Each subsection: **why** the step matters, then bullets before code blocks for **what** the command shows.
 
@@ -462,13 +459,10 @@ sudo show platform npu acl ace -a 10483 -p 1
 - [ ] **`show acl table`** — **ACL_DENY** on **Ethernet0**, description **ALLOW ICMP, BLOCK HTTP**
 - [ ] **Leaf1** **`curl http://3.4.1.3:80`** times out after ACL apply; **`aclshow -t ACL_DENY`** shows **20-DENY-HTTP** hits climbing (retry with **`curl --retry 0 --retry-all-errors --connect-timeout 0 --max-time 0 …`** if needed)
 - [ ] **`sudo show platform npu acl summary`** / **`ace`** — **PROTOCOL** / **DPORT** match TCP **80** + **ICMP** at ACE positions **0** / **1** for **your** **ACL ID**
-- [ ] **Close-out** — Lab **`ACL_DENY`** removed from **`/etc/sonic/config_db.json`** + **`config reload`** **before** **Exercise 2** or handoff
 
 ---
 
 ## Exercise 2 — CoPP: verification
-
-> **Prerequisite** — If you ran **Exercise 1**, remove lab **`ACL_DENY`** (**`ACL_TABLE`** / **`ACL_RULE`**) from **`/etc/sonic/config_db.json`**, then **`sudo config reload -y`**, **before** this exercise so ingress ACL state does not overlap CoPP reads.
 
 ### Objectives
 
@@ -874,4 +868,4 @@ Run **in order** for **post-change** validation, **upgrade** acceptance, or **in
 
 ### About the sample output
 
-> **Sample output** — **Exercise 1** counters vary with traffic and timing; remove lab **`ACL_DENY`** from **`/etc/sonic/config_db.json`** per runbook when finished. **Exercise 2** excerpts reflect **Cisco 8000** SONiC validation runs. **Redis DB indices**, **ACL IDs**, **PIDs**, and **timestamps** differ by branch—**confirm on your device** before sign-off.
+> **Sample output** — **Exercise 1** counters vary with traffic and timing. **Exercise 2** excerpts reflect **Cisco 8000** SONiC validation runs. **Redis DB indices**, **ACL IDs**, **PIDs**, and **timestamps** differ by branch—**confirm on your device** before sign-off.
