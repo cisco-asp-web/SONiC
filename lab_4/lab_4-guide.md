@@ -1,26 +1,58 @@
-# Cisco 8000 SONiC — ACL & CoPP Lab Guide
+# Cisco 8000 SONiC — L4 ACL & CoPP Lab Guide
 
-This guide combines two hands-on tracks for **SONiC on Cisco 8000**: **Exercise 1** programs and verifies an **L3 ingress ACL** on a front-panel port; **Exercise 2** walks a **read-only CoPP (Control Plane Policing) verification** flow (seed policy, SWSS, APPL_DB, orchestration logs, STATE_DB). Use it for training, acceptance testing, or operational runbooks.
+> **Scope** · Cisco **8000** · SONiC · **Ingress ACL** (ICMP permit, TCP **dport 80** drop) · **CoPP** read-only verification
 
-**Format:** Step-by-step structure with objectives, prerequisites, commands, example output, and checklists. (A reference template at `https://github.com/cisco-asp-web/SONiC/blob/main/lab_2/lab_2-guide.md` was not reachable during authoring; this document follows a common lab-guide pattern: overview, learning objectives, environment, discrete exercises, verification.)
+**Hands-on** L4-aware **ingress ACL** configuration and **read-only CoPP** checks—structured for **training**, **acceptance testing**, and **operator runbooks**.
+
+| Track | What you build / verify | Primary artifacts |
+|:-----:|-------------------------|---------------------|
+| **1** | **L3-type** ingress ACL on **Ethernet0** — **`IP_PROTOCOL`**, **`L4_DST_PORT`**, **`PACKET_ACTION`** | **`acl_L4.json`**, **`show acl`**, **`aclshow`**, **`counterpoll`**, **`sudo show platform npu acl`**, optional **Redis** **`ACL_RULE`** |
+| **2** | CoPP path from **seed** to **STATE_DB** | **`copp_cfg.json`**, **swss** / **orchagent** / **coppmgrd**, **APPL_DB** **`COPP_TABLE`**, **`swss.rec`**, **`COPP_GROUP_TABLE`** |
+
+> **Persistence** — After **`config load`**, lab **`ACL_TABLE`** / **`ACL_RULE`** usually land in **`/etc/sonic/config_db.json`** and survive **`config reload`** / **reboot** until removed (**`vi`**, **`config`**, or approved tooling). Clear **`ACL_DENY`** before **Exercise 2** or **handoff** so **Ethernet0** HTTP and CoPP baselines stay trustworthy.
+
+**Conventions:** Each exercise flows **objectives → prerequisites → commands → sample output → checklists**. Prompts show **`admin@…`**; use **`sudo`** where indicated.
 
 ---
 
 ## Table of contents
 
-- [Learning objectives](#learning-objectives)
-- [Lab environment and shared prerequisites](#lab-environment-and-shared-prerequisites)
-- [Exercise 1 — L3 ingress ACL: configuration and verification](#exercise-1--l3-ingress-acl-configuration-and-verification)
-- [Exercise 2 — CoPP: verification](#exercise-2--copp-verification)
+| # | Section |
+|:-:|---------|
+| 1 | [Learning objectives](#learning-objectives) |
+| 2 | [Lab environment and shared prerequisites](#lab-environment-and-shared-prerequisites) |
+| 3 | [Guide flow (recommended order)](#guide-flow-recommended-order) |
+| 4 | [Exercise 1 — L4 ingress ACL (HTTP) and verification](#exercise-1--l4-ingress-acl-http-and-verification) — *Example 1 (L4 HTTP)* |
+| 5 | [Exercise 2 — CoPP: verification](#exercise-2--copp-verification) — *Verification Steps 1–5, troubleshooting, checklist* |
+| 6 | [Appendix — CoPP vs L3 ACL](#appendix--copp-vs-l3-acl-operational-distinction) |
+
+---
+
+## Guide flow (recommended order)
+
+| Step | Phase | Outcome |
+|:---:|:---|:---|
+| **1** | **Exercise 1** | Baseline **HTTP** → **`config load`** **`acl_L4.json`** → verify CLI, counters, NPU (**Redis** optional) |
+| **2** | **ACL cleanup** | Remove lab **`ACL_DENY`** from **`/etc/sonic/config_db.json`** → **`sudo config reload -y`** (runbook; not fully scripted here) |
+| **3** | **Exercise 2** | CoPP **Verification Steps 1–5** (read-only): **`copp_cfg.json`**, **swss**, **APPL_DB**, **`swss.rec`**, **STATE_DB** |
+
+```mermaid
+flowchart LR
+  A["Exercise 1\nACL + HTTP lab"] --> B["ACL cleanup\nconfig_db.json"]
+  B --> C["Exercise 2\nCoPP verification"]
+```
 
 ---
 
 ## Learning objectives
 
-After completing this lab, you should be able to:
+After this lab you should be able to:
 
-- **Exercise 1 (ACL):** Author SONiC **Config DB** JSON for an **L3** **INGRESS** ACL bound to a port; load it with `config load`; validate with `show acl`, `counterpoll`, `aclshow`, and **Cisco 8000** `show platform npu acl` (with `sudo`).
-- **Exercise 2 (CoPP):** Explain how **`copp_cfg.json`** maps **COPP_TRAP** to **COPP_GROUP**; verify **swss** / **orchagent** / **coppmgrd**; inspect **APPL_DB** `COPP_TABLE`, **swss.rec**, and **STATE_DB** `COPP_GROUP_TABLE` for consistency with the seed policy.
+| # | Skill |
+|:-:|---------|
+| 1 | **ACL (Exercise 1):** Author **Config DB** JSON for an **L3-type** **INGRESS** ACL on a port using **`IP_PROTOCOL`**, **`L4_DST_PORT`**, and **`PACKET_ACTION`** (**FORWARD** / **DROP**); **`config load`**; validate with **`show acl`**, **`counterpoll`**, **`aclshow`**, and **`sudo show platform npu acl`**; interpret optional **Redis** **`ACL_RULE`** / **`ACL_RULE_TABLE`** keys. |
+| 2 | **ACL:** Prove **HTTP** is blocked while **ICMP** is forwarded; complete **Example 1** checklist **Close-out** (**`/etc/sonic/config_db.json`** + **`config reload`**) per your runbook (procedure not copy-pasted in this guide). |
+| 3 | **CoPP (Exercise 2):** Explain **`copp_cfg.json`** (**`COPP_TRAP`** → **`COPP_GROUP`**); verify **swss** / **orchagent** / **coppmgrd**; read **APPL_DB** **`COPP_TABLE`**, **`swss.rec`**, and **STATE_DB** **`COPP_GROUP_TABLE`** against the seed. |
 
 ---
 
@@ -29,181 +61,202 @@ After completing this lab, you should be able to:
 | Item | Detail |
 |------|--------|
 | **Platform** | SONiC on **Cisco 8000** |
-| **Access** | Operator account with **sudo**; for CoPP, `docker exec` into the **swss** container where noted |
-| **Read-only vs change** | **Exercise 1** writes **CONFIG_DB** (config change). **Exercise 2** Verification Steps **1–5** are **read-only**; **Step 6** is policy-change guidance (maintenance window) |
-| **Reference outputs** | Example CLI and Redis excerpts illustrate **expected shape**; hostnames, timestamps, PIDs, Redis DB indices, and **orchagent** MAC arguments will differ on your devices |
+| **Access** | Operator with **sudo**; CoPP steps use **`docker exec`** into **swss** where noted |
+| **Change vs read-only** | **Exercise 1** **writes** **CONFIG_DB** via **`config load`**. **Exercise 2** **Verification Steps 1–5** are **read-only** (no CoPP policy edits in this guide) |
+| **Outputs** | Samples show **shape** only — hostnames, times, PIDs, **Redis** DB numbers, **ACL IDs**, and **orchagent** args differ by image |
 
 ---
 
-## Exercise 1 — L3 ingress ACL: configuration and verification
+## Exercise 1 — L4 ingress ACL (HTTP) and verification
+
+| Role | In this capture |
+|:-----|:-----------------|
+| **ACL leaf** | **pod8-leaf3** · **`Ethernet0`** ingress bind |
+| **Client** | **pod8-leaf1** · **`curl`** → **3.4.1.3:80** |
+| **Your lab** | Adjust hostnames and IPs to match **your** topology |
 
 ### Objectives
 
-- Configure an **L3** **INGRESS** ACL on **Ethernet0** that **drops** IPv4 traffic matching **SRC_IP** `1.1.1.1/32` and **DST_IP** `3.3.3.3/32`.
-- Verify the ACL in **`show acl`**, **`aclshow`** / **`counterpoll`**, and **Cisco 8000** **`sudo show platform npu acl`**.
+| Example | Goal |
+|:-------:|------|
+| **1** | On **Ethernet0** **INGRESS**: **`FORWARD`** ICMP (**`IP_PROTOCOL`** = **1**, any IPv4 **SRC/DST**); **`DROP`** TCP **dport 80** (**HTTP**). Prove in **`show acl`**, **`aclshow`** / **`counterpoll`**, **`sudo show platform npu acl`**, optional **Redis**. |
 
-This lab walks through configuring an ingress **L3** ACL on **Ethernet0** and verifying it in the SONiC CLI, ACL counters, and the Cisco 8000 NPU. Commands and **example output** are from a SONiC session on **pod8-leaf3**; counter verification uses test traffic from **Leaf1**.
+> **Before `config load`** — On the ACL leaf: **`show acl table`** · **`show acl rule`**. If **`ACL_DENY`** (or any other ingress ACL on **Ethernet0**) exists, clear it via **your runbook** so **`acl_L4.json`** merges cleanly.  
+> **After Exercise 1** — Delete lab **`ACL_DENY`** **`ACL_TABLE`** / **`ACL_RULE`** from **`/etc/sonic/config_db.json`**, then **`sudo config reload -y`** (or equivalent) **before** **Exercise 2** or handoff.
 
-**ACL JSON:** **Step 2 — ACL JSON on the switch** (below) includes the file contents and a **field-by-field description** of `ACL_TABLE` and `ACL_RULE` (what each key does and how traffic matches).
-
-Each numbered step opens with **why** you run it; bullets before code blocks describe **what each command does** in this lab.
-
----
-
-### Prerequisites
-
-You need a lab path where traffic can hit the ACL leaf the way the JSON assumes, and the same CLIs as in the capture. This list is the minimum software, access, and topology assumptions before you run the steps.
-
-- SONiC on **Cisco 8000** with `config`, `show acl`, `aclshow`, `counterpoll`, and `sudo show platform npu acl …`
-- Shell user **admin** with **sudo**
-- Port **Ethernet0** used as the ACL binding on the leaf where the ACL is applied (**pod8-leaf3** in the original capture)
-- **Leaf1** can source traffic as **1.1.1.1** toward **3.3.3.3** across the lab fabric (adjust host/interface names to your topology)
+Each subsection: **why** the step matters, then bullets before code blocks for **what** the command shows.
 
 ---
 
-### Topology (reference)
+### Example 1 — L4 TCP destination port 80 (HTTP)
 
-This section ties names (**Leaf1**, ACL leaf, **Ethernet0**) to the match fields in the JSON so later steps are unambiguous.
+This example uses the **L3** ACL **table type** on **Ethernet0** (**pod8-leaf3** in the capture) but matches **IP protocol** and **TCP destination port 80**. A **higher-priority** rule (**`PRIORITY`** **10**) **forwards ICMP** so echo/traceroute-style traffic can still work; a **lower-priority** rule (**20**) **drops TCP** to port **80** so HTTP clients time out. In SONiC, **lower numeric `PRIORITY`** is **higher precedence** in typical **`show acl rule`** ordering.
 
-Ingress on **Ethernet0** (ACL leaf): drop IPv4 when **SRC_IP** is `1.1.1.1/32` and **DST_IP** is `3.3.3.3/32`.
+#### Topology and traffic (reference)
 
-**Traffic for Step 6:** initiated from **Leaf1** so replies or echo requests use the lab addresses the ACL matches:
+| Role | Host (capture) | Action |
+|------|----------------|--------|
+| **ACL leaf** | **pod8-leaf3** | After baseline, apply **`/tmp/acl_L4.json`** (**`Ethernet0`** ingress bind in capture) |
+| **HTTP client** | **pod8-leaf1** | `curl http://3.4.1.3:80` (and `curl -v --connect-timeout 3 …` for verbose timeout proof) |
+| **HTTP server** | **3.4.1.3** | `sudo python3 -m http.server 80 --bind 3.4.1.3` on the device that owns **3.4.1.3** |
 
-```bash
-ping 3.3.3.3 -I 1.1.1.1
-```
+Run the steps **in order**: first prove **HTTP** works with **no L4 ACL** (server on **3.4.1.3**, **curl** from **Leaf1**). Then load **`acl_L4.json`** on the ACL leaf and show that **TCP port 80** is **dropped** while **ICMP** stays **FORWARD**.
 
-- **`ping`** — Generates ICMP echo traffic toward `3.3.3.3`.
-- **`-I 1.1.1.1`** — On Linux, binds the source address (and often the egress interface) so packets leave Leaf1 as **1.1.1.1** toward **3.3.3.3**; use the equivalent on your OS if needed.
+#### Baseline — start server and confirm HTTP (before `acl_L4.json`)
 
----
-
-### Step 1 — Baseline (optional)
-
-Confirm the switch has **no** ACL tables/rules (or note what is already present) so you can tell the lab config apart from any pre-existing state. Skip if you already know the device is clean.
-
-- **`show acl rule`** — Lists every ACL rule from the running/orchestrated view: table, rule name, priority, action, match fields, and status (e.g. Active).
+On **pod8-leaf3** (the capture uses the host that owns **3.4.1.3**), start **SimpleHTTP** bound to **3.4.1.3** port **80**:
 
 ```bash
-show acl rule
-```
-
-**Output (before load):**
-
-```text
-Table    Rule    Priority    Action    Match    Status
--------  ------  ----------  --------  -------  --------
-```
-
-- **`show acl table`** — Lists ACL tables: type (L3/L2), which ports they bind to, stage (ingress/egress), description, and status.
-
-```bash
-show acl table
-```
-
-**Output (before load):**
-
-```text
-Name    Type    Binding    Description    Stage    Status
-------  ------  ---------  -------------  -------  --------
-```
-
----
-
-### Step 2 — ACL JSON on the switch
-
-This step has two parts: the JSON you load into Config DB, then a **description of every field** (tables and behavior summary).
-
-- **`cat /tmp/acl.json`** — Prints the file so you can proofread keys and values before loading (path is arbitrary; `/tmp` is common on switches).
-
-```bash
-cat /tmp/acl.json
+sudo python3 -m http.server 80 --bind 3.4.1.3
 ```
 
 **Output:**
+
+```text
+Serving HTTP on 3.4.1.3 port 80 (http://3.4.1.3:80/) ...
+```
+
+On **pod8-leaf1**, verbose **curl** — expect **Connected**, **HTTP/1.0 200 OK**, and the directory listing:
+
+```bash
+curl -v --connect-timeout 3 http://3.4.1.3
+```
+
+**Output:**
+
+```text
+*   Trying 3.4.1.3:80...
+* Connected to 3.4.1.3 (3.4.1.3) port 80 (#0)
+> GET / HTTP/1.1
+> Host: 3.4.1.3
+> User-Agent: curl/7.88.1
+> Accept: */*
+>
+* HTTP 1.0, assume close after body
+< HTTP/1.0 200 OK
+< Server: SimpleHTTP/0.6 Python/3.11.2
+< Date: Tue, 21 Apr 2026 00:12:02 GMT
+< Content-type: text/html; charset=utf-8
+< Content-Length: 524
+<
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href=".bash_history">.bash_history</a></li>
+<li><a href=".bash_logout">.bash_logout</a></li>
+<li><a href=".bashrc">.bashrc</a></li>
+<li><a href=".lesshst">.lesshst</a></li>
+<li><a href=".profile">.profile</a></li>
+<li><a href=".sudo_as_admin_successful">.sudo_as_admin_successful</a></li>
+<li><a href=".viminfo">.viminfo</a></li>
+</ul>
+<hr>
+</body>
+</html>
+* Closing connection 0
+```
+
+On **pod8-leaf1**, plain **curl** (HTML body only):
+
+```bash
+curl http://3.4.1.3:80
+```
+
+**Output:**
+
+```text
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href=".bash_history">.bash_history</a></li>
+<li><a href=".bash_logout">.bash_logout</a></li>
+<li><a href=".bashrc">.bashrc</a></li>
+<li><a href=".lesshst">.lesshst</a></li>
+<li><a href=".profile">.profile</a></li>
+<li><a href=".sudo_as_admin_successful">.sudo_as_admin_successful</a></li>
+<li><a href=".viminfo">.viminfo</a></li>
+</ul>
+<hr>
+</body>
+</html>
+```
+
+#### ACL JSON (`/tmp/acl_L4.json`)
+
+```bash
+cat /tmp/acl_L4.json
+```
+
+**File contents:**
 
 ```json
 {
-    "ACL_TABLE": {
-        "ACL_DENY": {
-            "policy_desc": "ACL DENY",
-            "ports": [
-                "Ethernet0"
-            ],
-            "stage": "INGRESS",
-            "type": "L3"
-        }
-    },
-    "ACL_RULE": {
-        "ACL_DENY|10-DENY": {
-            "PRIORITY": "10",
-            "IP_TYPE": "IP",
-            "SRC_IP": "1.1.1.1/32",
-            "DST_IP": "3.3.3.3/32",
-            "PACKET_ACTION": "DROP"
-        }
+  "ACL_TABLE": {
+    "ACL_DENY": {
+      "policy_desc": "ALLOW ICMP, BLOCK HTTP",
+      "ports": [
+        "Ethernet0"
+      ],
+      "stage": "INGRESS",
+      "type": "L3"
     }
+  },
+  "ACL_RULE": {
+    "ACL_DENY|10-ALLOW-ICMP": {
+      "PRIORITY": "10",
+      "IP_PROTOCOL": "1",
+      "SRC_IP": "0.0.0.0/0",
+      "DST_IP": "0.0.0.0/0",
+      "PACKET_ACTION": "FORWARD"
+    },
+    "ACL_DENY|20-DENY-HTTP": {
+      "PRIORITY": "20",
+      "IP_PROTOCOL": "6",
+      "L4_DST_PORT": "80",
+      "SRC_IP": "0.0.0.0/0",
+      "DST_IP": "0.0.0.0/0",
+      "PACKET_ACTION": "DROP"
+    }
+  }
 }
 ```
 
-*(Create this file with `cat > /tmp/acl.json <<'EOF'` … `EOF` if you are building it from scratch; that here-document writes the JSON to disk without an external editor.)*
+**Field summary:**
 
-### Description of the ACL JSON (field reference)
+| Key | Meaning in this lab |
+|-----|---------------------|
+| **`IP_PROTOCOL`** | **`1`** = ICMP (rule permits it). **`6`** = TCP (rule matches HTTP transport). |
+| **`L4_DST_PORT`** | **`80`** = match TCP **destination** port HTTP. |
+| **`SRC_IP` / `DST_IP`** | **`0.0.0.0/0`** = any IPv4 address (narrow further if your policy requires). |
+| **`PACKET_ACTION`** | **`FORWARD`** = do not drop for that match at this ACL stage; **`DROP`** = discard. |
 
-This JSON is a **SONiC Config DB** fragment that defines **one L3 ingress ACL** bound to a front-panel port and **one IPv4 drop rule**.
+#### Apply ACL and verify in SONiC CLI
 
-#### `ACL_TABLE` → `ACL_DENY`
-
-| Field | Meaning |
-|--------|--------|
-| **`ACL_TABLE`** | Top-level object for ACL *tables* (where ACLs attach and which pipeline stage they use). |
-| **`ACL_DENY`** | Name of this ACL table. All rules for it use keys like `ACL_DENY\|<rule-name>`. |
-| **`policy_desc`** | Human-readable string (`ACL DENY`); for operators / `show acl table`, not used for matching. |
-| **`ports`** | Interfaces the table is **bound** to. Here **`Ethernet0`**: the ACL is evaluated on **ingress** traffic arriving on that port. |
-| **`stage`** | **`INGRESS`**: rules run on traffic **into** the listed ports (before normal forwarding for that packet on that hop). |
-| **`type`** | **`L3`**: IPv4/IPv6-style fields (e.g. SIP/DIP) are allowed; not a pure L2 MAC/VLAN ACL table. |
-
-**Summary:** On **`Ethernet0`**, at **ingress**, apply L3 table **`ACL_DENY`**.
-
-#### `ACL_RULE` → `ACL_DENY|10-DENY`
-
-| Field | Meaning |
-|--------|--------|
-| **`ACL_RULE`** | Top-level object for individual **rules**; each key ties a rule to a table. |
-| **`ACL_DENY|10-DENY`** | Rule **`10-DENY`** in table **`ACL_DENY`** (SONiC’s `TABLE|RULE` naming). |
-| **`PRIORITY`** | **`10`**: rule ordering vs other rules in the same table (lower number = higher precedence in typical SONiC ACL displays). |
-| **`IP_TYPE`** | **`IP`**: match **IPv4** (as opposed to IPv6-only or other classifications, depending on image). |
-| **`SRC_IP`** | **`1.1.1.1/32`**: source address must be exactly **1.1.1.1**. |
-| **`DST_IP`** | **`3.3.3.3/32`**: destination address must be exactly **3.3.3.3**. |
-| **`PACKET_ACTION`** | **`DROP`**: matching packets are **silently discarded** at this ACL application point (no forward out that path for this rule’s hit). |
-
-**Behavior summary:** Any **IPv4** packet entering **`Ethernet0`** whose **source is 1.1.1.1** and **destination is 3.3.3.3** matches **`10-DENY`** and is **dropped** at **ingress** on that port, under table **`ACL_DENY`**.
-
----
-
-### Step 3 — Load into Config DB
-
-Merge the JSON into **Config DB** so orchagent and related daemons can program the ASIC. **`sudo`** is required to write system configuration; **`-y`** skips interactive confirmation (omit it if you prefer prompts).
-
-- **`sudo config load <file> -y`** — Runs `sonic-cfggen` to apply JSON keys to Redis Config DB; only keys present in the file are merged (behavior may vary by image for deletes).
+On **pod8-leaf3** (ACL leaf), merge **`acl_L4.json`** into **CONFIG DB**, then confirm tables and rules:
 
 ```bash
-sudo config load /tmp/acl.json -y
+sudo config load /tmp/acl_L4.json -y
 ```
 
 **Output:**
 
 ```text
-Running command: /usr/local/bin/sonic-cfggen -j /tmp/acl.json --write-to-db
+Running command: /usr/local/bin/sonic-cfggen -j /tmp/acl_L4.json --write-to-db
 ```
-
----
-
-### Step 4 — Verify logical ACL
-
-After load, confirm SONiC’s **control-plane view** of ACLs matches intent: table bound to the right port, rule **Active**, action **DROP**, and match fields correct. These `show acl` commands read state the same way operators troubleshoot (no ASIC debug socket).
-
-- **`show acl rule`** — All rules, or use optional table name / `--verbose` for one table (see below).
 
 ```bash
 show acl rule
@@ -212,14 +265,16 @@ show acl rule
 **Output:**
 
 ```text
-Table     Rule     Priority    Action    Match               Status
---------  -------  ----------  --------  ------------------  --------
-ACL_DENY  10-DENY  10          DROP      DST_IP: 3.3.3.3/32  Active
-                                         IP_TYPE: IP
-                                         SRC_IP: 1.1.1.1/32
+Table     Rule           Priority    Action    Match              Status
+--------  -------------  ----------  --------  -----------------  --------
+ACL_DENY  20-DENY-HTTP   20          DROP      DST_IP: 0.0.0.0/0  Active
+                                               IP_PROTOCOL: 6
+                                               L4_DST_PORT: 80
+                                               SRC_IP: 0.0.0.0/0
+ACL_DENY  10-ALLOW-ICMP  10          FORWARD   DST_IP: 0.0.0.0/0  Active
+                                               IP_PROTOCOL: 1
+                                               SRC_IP: 0.0.0.0/0
 ```
-
-- **`show acl table`** — Summarizes each ACL table’s bindings and stage after programming.
 
 ```bash
 show acl table
@@ -228,282 +283,203 @@ show acl table
 **Output:**
 
 ```text
-Name      Type    Binding    Description      Stage    Status
---------  ------  ---------  ---------------  -------  --------
-ACL_DENY  L3      Ethernet0  ACL DENY           ingress  Active
+Name      Type    Binding    Description             Stage    Status
+--------  ------  ---------  ----------------------  -------  --------
+ACL_DENY  L3      Ethernet0  ALLOW ICMP, BLOCK HTTP  ingress  Active
 ```
 
-- **`show acl rule ACL_DENY --verbose`** — Narrows output to table **ACL_DENY** and invokes `acl-loader show rule` under the hood for the same logical view with optional extra detail depending on image.
+**Redis (`redis-cli`) verification:** On the ACL leaf, inspect **CONFIG_DB** (Redis DB **4**) for the **`ACL_RULE`** hashes and **STATE_DB** (Redis DB **6**) for **`ACL_RULE_TABLE`** status. That ties the **`show acl table`** / **`show acl rule`** view to what **CONFIG_DB** and **STATE_DB** hold for the same table and rule names.
 
 ```bash
-show acl rule ACL_DENY --verbose
+redis-cli -n 4 hgetall "ACL_RULE|ACL_DENY|20-DENY-HTTP"
+redis-cli -n 4 hgetall "ACL_RULE|ACL_DENY|10-ALLOW-ICMP"
+redis-cli -n 6 hgetall "ACL_RULE_TABLE|ACL_DENY|20-DENY-HTTP"
+redis-cli -n 6 hgetall "ACL_RULE_TABLE|ACL_DENY|10-ALLOW-ICMP"
 ```
 
 **Output:**
 
 ```text
-Running command: acl-loader show rule ACL_DENY
-Table     Rule     Priority    Action    Match               Status
---------  -------  ----------  --------  ------------------  --------
-ACL_DENY  10-DENY  10          DROP      DST_IP: 3.3.3.3/32  Active
-                                         IP_TYPE: IP
-                                         SRC_IP: 1.1.1.1/32
+admin@pod8-leaf3:~$ redis-cli -n 4 hgetall "ACL_RULE|ACL_DENY|20-DENY-HTTP"
+ 1) "DST_IP"
+ 2) "0.0.0.0/0"
+ 3) "IP_PROTOCOL"
+ 4) "6"
+ 5) "L4_DST_PORT"
+ 6) "80"
+ 7) "PACKET_ACTION"
+ 8) "DROP"
+ 9) "PRIORITY"
+10) "20"
+11) "SRC_IP"
+12) "0.0.0.0/0"
+admin@pod8-leaf3:~$ redis-cli -n 4 hgetall "ACL_RULE|ACL_DENY|10-ALLOW-ICMP"
+ 1) "DST_IP"
+ 2) "0.0.0.0/0"
+ 3) "IP_PROTOCOL"
+ 4) "1"
+ 5) "PACKET_ACTION"
+ 6) "FORWARD"
+ 7) "PRIORITY"
+ 8) "10"
+ 9) "SRC_IP"
+10) "0.0.0.0/0"
+admin@pod8-leaf3:~$ redis-cli -n 6 hgetall "ACL_RULE_TABLE|ACL_DENY|20-DENY-HTTP"
+1) "status"
+2) "Active"
+admin@pod8-leaf3:~$ redis-cli -n 6 hgetall "ACL_RULE_TABLE|ACL_DENY|10-ALLOW-ICMP"
+1) "status"
+2) "Active"
 ```
 
----
+#### After ACL — HTTP blocked (same `curl` from Leaf1)
 
-### Step 5 — Counter polling
-
-ACL **hit counters** in SONiC are updated by a polling process. This step confirms **ACL** counter polling is **enabled** and how often it runs; without that, `aclshow` may look stale or empty depending on timing.
-
-- **`counterpoll show`** — Displays all counter poll types, interval in milliseconds, and enable/disable status.
+With **`acl_L4.json`** applied on the **ACL leaf**, repeat **`curl`** from **pod8-leaf1**. TCP to port **80** should not complete; **`curl`** reports a timeout:
 
 ```bash
-counterpoll show
+curl -v --connect-timeout 3 http://3.4.1.3:80
 ```
 
 **Output:**
 
 ```text
-Type                        Interval (in ms)    Status
---------------------------  ------------------  --------
-QUEUE_STAT                  default (10000)     enable
-PORT_STAT                   default (1000)      enable
-PORT_BUFFER_DROP            default (60000)     enable
-RIF_STAT                    default (1000)      enable
-QUEUE_WATERMARK_STAT        default (60000)     enable
-PG_WATERMARK_STAT           default (60000)     enable
-PG_DROP_STAT                default (10000)     enable
-BUFFER_POOL_WATERMARK_STAT  default (60000)     enable
+*   Trying 3.4.1.3:80...
+* ipv4 connect timeout after 3000ms, move on!
+* Failed to connect to 3.4.1.3 port 80 after 3000 ms: Timeout was reached
+curl: (28) Failed to connect to 3.4.1.3 port 80 after 3000 ms: Timeout was reached
+```
+
+#### ACL counters
+
+While **TCP** attempts to **3.4.1.3:80** keep hitting the ACL, **`PACKETS COUNT`** and **`BYTES COUNT`** for **`20-DENY-HTTP`** **rise over time**. **`counterpoll`** updates ACL statistics on an interval (often **10 s** in the capture), so running **`aclshow -t ACL_DENY`** **several times in a row**—or leaving a client **retrying** in the background—shows the counts **stair-step upward** (for example **9 → 10 → 11 → 12** packets) as drops accumulate.
+
+```bash
+counterpoll show | grep ACL
+```
+
+**Output:**
+
+```text
 ACL                         10000               enable
 ```
 
----
-
-### Step 6 — Verify ACL counters (`aclshow`)
-
-**`aclshow`** reads **ACL counter** statistics (packets/bytes per rule) that the dataplane accumulates for matched traffic. The flow below: inspect counters, clear them, generate lab traffic from **Leaf1**, then confirm counts rise on the ACL leaf.
-
-- **`aclshow -t ACL_DENY`** — Shows counters only for rules in table **ACL_DENY** (useful when many ACL tables exist). Run it first to baseline hits on this table.
-
-```bash
-aclshow -t ACL_DENY
-```
-
-**Example output (while hits exist):**
-
-```text
-RULE NAME    TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
------------  ------------  ------  ---------------  -------------
-10-DENY      ACL_DENY          10               62           6324
-```
-
-- **`aclshow`** — Lists all ACL rules that have counter entries (in a small lab, often the same rows as `-t` for a single table).
-
-Verify all ACL counters (same data when only one rule is active):
-
-```bash
-aclshow
-```
-
-**Example output:**
-
-```text
-RULE NAME    TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
------------  ------------  ------  ---------------  -------------
-10-DENY      ACL_DENY          10              229          23358
-```
-
-- **`aclshow -c`** — Clears ACL counter statistics in SONiC so the next measurement starts from zero (run on the **ACL leaf** where you read counters).
-
-Clear ACL statistics so the next test starts from zero:
-
 ```bash
 aclshow -c
-```
-
-**Example output right after clear (no hits yet):**
-
-```bash
 aclshow
-```
-
-```text
-RULE NAME    TABLE NAME    PRIO    PACKETS COUNT    BYTES COUNT
------------  ------------  ------  ---------------  -------------
-```
-
-From **Leaf1**, generate traffic that matches the rule (source **1.1.1.1**, destination **3.3.3.3**). Same command as in [Topology](#topology-reference); ICMP is carried in IPv4, so echo traffic increments the drop counter if those IPv4 headers match the ACL at the bind point.
-
-```bash
-ping 3.3.3.3 -I 1.1.1.1
-```
-
-On the ACL **leaf** (where **Ethernet0** sees this flow), confirm counters increase again:
-
-```bash
-aclshow
-```
-
-**Example output after traffic:**
-
-```text
-RULE NAME    TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
------------  ------------  ------  ---------------  -------------
-10-DENY      ACL_DENY          10               13           1326
-```
-
-- **`aclshow -t ACL_DENY`** (again) — Re-check the same table after traffic; packet/byte totals should climb if the path hits this rule.
-
-```bash
 aclshow -t ACL_DENY
 ```
 
-**Example output:**
+**Example (`aclshow -t ACL_DENY` after several short `curl` attempts):**
 
 ```text
-RULE NAME    TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
------------  ------------  ------  ---------------  -------------
-10-DENY      ACL_DENY          10               91           9282
+RULE NAME     TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
+------------  ------------  ------  ---------------  -------------
+20-DENY-HTTP  ACL_DENY          20               12            936
 ```
 
-> **Note:** **`-r`** filters by **rule name** (e.g. `10-DENY`), not by table. Use **`aclshow -r 10-DENY`** if you want rule-specific counters.
-
-- **`aclshow -h`** — Prints option summary (`-a` all, `-c` clear, `-r` rules, `-t` tables, verbosity).
+To **sustain** connection attempts from **pod8-leaf1** while you watch counters on **pod8-leaf3**, you can leave **`curl`** running with aggressive retry and no overall time cap (stop with **Ctrl+C** when finished):
 
 ```bash
-aclshow -h
+curl --retry 0 --retry-all-errors --connect-timeout 0 --max-time 0 http://3.4.1.3:80
 ```
 
-**Output:**
+On **pod8-leaf3**, run **`aclshow -t ACL_DENY`** repeatedly in another session. **Packet** and **byte** totals increase as long as the client keeps trying **TCP port 80** (each poll or each check may show the same value twice if no new drops arrived between samples—then the next bump appears when new packets are dropped):
 
 ```text
-usage: aclshow [-h] [-a] [-c] [-r RULES] [-t TABLES] [-v] [-vv]
-
-Display SONiC switch Acl Rules and Counters
-
-options:
-  -h, --help            show this message and exit
-  -a, --all             Show all ACL counters
-  -c, --clear           Clear ACL counters statistics
-  -r RULES, --rules RULES
-                        action by specific rules list: Rule1_Name,Rule2_Name
-  -t TABLES, --tables TABLES
-                        action by specific tables list: Table1_Name,Table2_Name
-  -v, --version         show program's version number and exit
-  -vv, --verbose        Verbose output
+admin@pod8-leaf3:~$ aclshow -t ACL_DENY
+RULE NAME     TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
+------------  ------------  ------  ---------------  -------------
+20-DENY-HTTP  ACL_DENY          20                9            702
+admin@pod8-leaf3:~$ aclshow -t ACL_DENY
+RULE NAME     TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
+------------  ------------  ------  ---------------  -------------
+20-DENY-HTTP  ACL_DENY          20               10            780
+admin@pod8-leaf3:~$ aclshow -t ACL_DENY
+RULE NAME     TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
+------------  ------------  ------  ---------------  -------------
+20-DENY-HTTP  ACL_DENY          20               10            780
+admin@pod8-leaf3:~$ aclshow -t ACL_DENY
+RULE NAME     TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
+------------  ------------  ------  ---------------  -------------
+20-DENY-HTTP  ACL_DENY          20               11            858
+admin@pod8-leaf3:~$ aclshow -t ACL_DENY
+RULE NAME     TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
+------------  ------------  ------  ---------------  -------------
+20-DENY-HTTP  ACL_DENY          20               11            858
+admin@pod8-leaf3:~$ aclshow -t ACL_DENY
+RULE NAME     TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
+------------  ------------  ------  ---------------  -------------
+20-DENY-HTTP  ACL_DENY          20               11            858
+admin@pod8-leaf3:~$ aclshow -t ACL_DENY
+RULE NAME     TABLE NAME      PRIO    PACKETS COUNT    BYTES COUNT
+------------  ------------  ------  ---------------  -------------
+20-DENY-HTTP  ACL_DENY          20               12            936
 ```
 
----
+> **Note:** Only **`20-DENY-HTTP`** accumulates drops for this test; **`10-ALLOW-ICMP`** does not increment for TCP.
 
-### Step 7 — Verify in hardware (NPU)
-
-Cisco 8000 exposes **ASIC-level** ACL bind points and ACE contents via **`show platform npu acl`**. That path talks to a **debug/SDK context** and normally requires **root/sudo**. Use it to prove the hardware programmed SIP/DIP and to capture the dynamic **ACL ID** for deep dives.
-
-Without **sudo** (expect failure on images that require privileged ASIC access):
-
-```bash
-show platform npu acl summary
-```
-
-**Output:**
-
-```text
-cannot connect to debug shell socket asic 0. Are you using sudo?
-```
-
-- **`sudo show platform npu acl summary`** — High-level view: L3 port ACL bind (which ingress IPv4 ACL instance is on the port), TCAM/resource summary, and **ACE table** rows (SIP/DIP masks as programmed).
-
-With **sudo**:
+#### NPU / ASIC view (Cisco 8000)
 
 ```bash
 sudo show platform npu acl summary
 ```
 
-**Output:**
+**Output (ACE table excerpt — TCP destination port 80 and ICMP):**
 
 ```text
-show acl all
-ACL is not binding to L2 SERVICE PORT
- +---------------------------------------------+
- |               L3 PORT ACL Bind              |
- +---------------------+-----------------------+
- | L3 AC PORT(gid:oid) | Ingress IPv4 ACL ID/0 |
- +---------------------+-----------------------+
- |      0x404:618      |         10483         |
- +---------------------+-----------------------+
- +----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
- |                                                                                                                                                   ACL Table                                                                                                                                                    |
- +--------+------------+----------+----------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------------------+
- | ACL ID | ACE Number | Key Type |      Available       |                                                                                                Key Profile                                                                                                 |              Command Profile              |
- +--------+------------+----------+----------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------------------+
- | 10481  |     0      | ETHERNET | 18446744073709551615 |                               Direction = {INGRESS},TCAM interface = {E_0},Resoure Type = {INGRESS_IPV6_NARROW_DB2_INTERFACE0_ACL},Fields = {ETHER_TYPE SOURCE_SYSTEM_PORT }                               | Actions = {                             } |
- | 10483  |     1      |   IPV4   |        32767         | Direction = {INGRESS},TCAM interface = {E_0},Resoure Type = {INGRESS_IPV6_NARROW_DB2_INTERFACE1_ACL},Fields = {TOS PROTOCOL IPV4_SIP IPV4_DIP SPORT DPORT MSG_CODE MSG_TYPE TCP_FLAGS SOURCE_SYSTEM_PORT } | Actions = {                             } |
- +--------+------------+----------+----------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------------------+
- +------------------------------------------------------------------------------+
- |                                  ACE Table                                   |
- +--------+----------+-------------------------+-------------------------+------+
- | ACL ID | Position |       IPV4_SIP(F)       |       IPV4_DIP(F)       | (C)  |
- +--------+----------+-------------------------+-------------------------+------+
- | 10483  |    0     | 1.1.1.1/255.255.255.255 | 3.3.3.3/255.255.255.255 | True |
- +--------+----------+-------------------------+-------------------------+------+
+ +--------+----------+-------------+-----------------+-----------------+-------------+------+
+ | ACL ID | Position | PROTOCOL(F) |   IPV4_SIP(F)   |   IPV4_DIP(F)   |   DPORT(F)  | (C)  |
+ +--------+----------+-------------+-----------------+-----------------+-------------+------+
+ | 10483  |    0     |    6/255    | 0.0.0.0/0.0.0.0 | 0.0.0.0/0.0.0.0 | 0x50/0xffff | True |
+ | 10483  |    1     |    1/255    | 0.0.0.0/0.0.0.0 | 0.0.0.0/0.0.0.0 |             |      |
+ +--------+----------+-------------+-----------------+-----------------+-------------+------+
 ```
 
-- **`sudo show platform npu acl ace -a <acl_id> -p <position>`** — Dumps the ACE at **position** inside **acl_id** (IDs come from the summary output; **10483** / **0** match this lab capture only).
+**`0x50`** is hexadecimal for decimal **80** (HTTP). **ACL ID** and **ACE Number** are examples from the capture—read the live values from **`sudo show platform npu acl summary`** on your switch.
 
 ```bash
 sudo show platform npu acl ace -a 10483 -p 0
+sudo show platform npu acl ace -a 10483 -p 1
 ```
 
-**Output:**
+**Output (`-p 0` — TCP port 80 match):**
 
 ```text
-show acl ace 10483 0 detail
- +------------------------------------------------------------------------------+
- |                                   ACL ACE                                    |
- +--------+----------+-------------------------+-------------------------+------+
- | ACL ID | Position |       IPV4_SIP(F)       |       IPV4_DIP(F)       | (C)  |
- +--------+----------+-------------------------+-------------------------+------+
- | 10483  |    0     | 1.1.1.1/255.255.255.255 | 3.3.3.3/255.255.255.255 | True |
- +--------+----------+-------------------------+-------------------------+------+
+ | ACL ID | Position | PROTOCOL(F) |   IPV4_SIP(F)   |   IPV4_DIP(F)   |   DPORT(F)  | (C)  |
+ | 10483  |    0     |    6/255    | 0.0.0.0/0.0.0.0 | 0.0.0.0/0.0.0.0 | 0x50/0xffff | True |
 ```
 
-> **Note:** **ACL ID** (here **10483**) comes from your device’s summary; it may differ on another switch or after reprogramming.
+**Output (`-p 1` — ICMP permit):**
 
----
+```text
+ | ACL ID | Position | PROTOCOL(F) |   IPV4_SIP(F)   |   IPV4_DIP(F)   |
+ | 10483  |    1     |    1/255    | 0.0.0.0/0.0.0.0 | 0.0.0.0/0.0.0.0 |
+```
 
-### Step 8 — Rollback / cleanup (optional)
+### Example 1 — Verification checklist
 
-When the lab is done, remove the ACL so it does not affect later work. SONiC images differ: some support **`config acl`** (or similar) to remove tables/rules; others use **`config`** to delete Config DB keys, or a curated JSON that removes **`ACL_TABLE`** / **`ACL_RULE`** entries. Prefer the documented method for your build so you do not leave partial state in Redis.
-
----
-
-### Verification checklist
-
-Use this list as a quick pass/fail gate; each line maps to a step above.
-
-- [ ] `show acl table` shows **ACL_DENY** on **Ethernet0**, **Active**
-- [ ] `show acl rule` shows **10-DENY**, **DROP**, matches and **Active**
-- [ ] `counterpoll show` shows **ACL** `enable`
-- [ ] `aclshow -t ACL_DENY` and `aclshow` show expected counts; `aclshow -c` resets; **Leaf1** `ping 3.3.3.3 -I 1.1.1.1` drives new hits on the ACL leaf
-- [ ] `sudo show platform npu acl summary` / `sudo show platform npu acl ace -a <acl_id> -p 0` match SIP/DIP in hardware
+- [ ] **`show acl rule`** — **10-ALLOW-ICMP** (**FORWARD**, **IP_PROTOCOL** 1) and **20-DENY-HTTP** (**DROP**, **IP_PROTOCOL** 6, **L4_DST_PORT** 80), both **Active**
+- [ ] **`show acl table`** — **ACL_DENY** on **Ethernet0**, description **ALLOW ICMP, BLOCK HTTP**
+- [ ] **Leaf1** **`curl http://3.4.1.3:80`** times out after ACL apply; **`aclshow -t ACL_DENY`** shows **20-DENY-HTTP** hits climbing (retry with **`curl --retry 0 --retry-all-errors --connect-timeout 0 --max-time 0 …`** if needed)
+- [ ] **`sudo show platform npu acl summary`** / **`ace`** — **PROTOCOL** / **DPORT** match TCP **80** + **ICMP** at ACE positions **0** / **1** for **your** **ACL ID**
+- [ ] **Close-out** — Lab **`ACL_DENY`** removed from **`/etc/sonic/config_db.json`** + **`config reload`** **before** **Exercise 2** or handoff
 
 ---
 
 ## Exercise 2 — CoPP: verification
 
+> **Prerequisite** — If you ran **Exercise 1**, remove lab **`ACL_DENY`** (**`ACL_TABLE`** / **`ACL_RULE`**) from **`/etc/sonic/config_db.json`**, then **`sudo config reload -y`**, **before** this exercise so ingress ACL state does not overlap CoPP reads.
+
 ### Objectives
 
-- Confirm **seed CoPP policy** on disk and trace it through **SWSS**, **APPL_DB** `COPP_TABLE`, **`swss.rec`**, and **STATE_DB** `COPP_GROUP_TABLE`.
-- Understand when **read-only** verification ends and **policy changes** require a controlled change window.
+- Trace **seed CoPP** → **SWSS** → **APPL_DB** **`COPP_TABLE`** → **`swss.rec`** → **STATE_DB** **`COPP_GROUP_TABLE`**.
+- Keep **Verification Steps 1–5** as **read-only** inspection; **policy** edits stay in your **change process**.
 
-This document is a **repeatable, read-only verification procedure** for **Control Plane Policing (CoPP)** on **Cisco 8000** SONiC. Use it after **installation**, **software upgrade**, **CONFIG_DB changes affecting CoPP**, or when **investigating control-plane instability** (BGP churn, neighbor loss, CPU punt pressure). It confirms that **seed policy**, **SWSS daemons**, **APPL_DB programming**, **orchestration logs**, and **STATE_DB health** are consistent.
+**Use this track when** · post-**install** / **upgrade** · **CONFIG_DB** touched CoPP · **control-plane** symptoms (**BGP** churn, neighbor loss, high punt CPU).
 
-**Theory:** The section **CoPP theory — configuration model and default behavior** explains **`copp_cfg.json`**, the **`default`** catch-all, **trap vs copy**, **SR_TCM** metering, and a **protocol-by-protocol** reading of Q200-style defaults. Read it once for context; the verification steps below do not require changing configuration.
+**Read once** · **CoPP theory** (below) for **`copp_cfg.json`**, **`default`** group, **trap vs copy**, **SR_TCM**, Q200-style trap map. **Samples** show **shape** only—compare live output to **`cat /etc/sonic/copp_cfg.json`** on **this** device (**PIDs**, **Redis DB indices**, **MAC** args differ by image).
 
-**Reference output:** Example CLI and Redis excerpts illustrate **expected shape** on a validated Cisco 8000 image. Your hostname, timestamps, PIDs, and MAC arguments to **orchagent** will differ. **Always compare** live output to **`/etc/sonic/copp_cfg.json`** on the same device.
-
-**Structure:** Each numbered step states **why** it belongs in this verification flow; bullets before code blocks state **what the command proves**.
+Each **Verification Step**: **Why** first, then bullets + code for **what** it proves.
 
 ---
 
@@ -511,7 +487,7 @@ This document is a **repeatable, read-only verification procedure** for **Contro
 
 - **Platform:** SONiC on **Cisco 8000** with **`show feature`**, **`redis-cli`** (and preferably **`sonic-db-cli`** per your runbook).
 - **Access:** Operator account with **`docker exec`** into the **swss** container (read-only checks inside SWSS).
-- **Change window:** **Verification Steps 1–5** are **non-disruptive**. **Verification Step 6** (policy changes) requires a **controlled maintenance window**, **rollback plan**, and **service-owner approval**—incorrect CoPP can drop **BGP**, **LACP**, or **ARP** to the CPU path.
+- **Change window:** **Verification Steps 1–5** are **non-disruptive** (read-only inspection). Incorrect CoPP changes made outside this guide can still drop **BGP**, **LACP**, or **ARP** to the CPU path—follow your release documentation when editing policy.
 
 ---
 
@@ -546,7 +522,7 @@ Typical **`default`** intent: a **moderate** policer on **queue 0** so miscellan
 
 The seed JSON discussed in this guide defines named traps such as **`bgp`**, **`lacp`**, **`arp`**, **`lldp`**, **`dhcp_relay`**, **`udld`**, **`ip2me`**, **`macsec`**, **`nat`**, and **`sflow`**. These are **policy containers**: the real ASIC programming uses the **`trap_ids`** strings inside each container. Your platform may add or omit traps by feature; treat this list as the **Q200 reference baseline**, not a guarantee on every SKU or branch.
 
-A single **Q200-style** example of the full **`COPP_GROUP`** / **`COPP_TRAP`** JSON appears under **Verification Step 1 — Confirm seed policy on disk** (the **Reference output** for `cat /etc/sonic/copp_cfg.json`). Use that block as the structural baseline; your on-switch file may differ slightly (for example the **`default`** object may include **`trap_action`**).
+A **Q200-style** excerpt of **`COPP_GROUP`** / **`COPP_TRAP`** appears under **Verification Step 1 — Confirm seed policy on disk** (truncated **Reference output** for `cat /etc/sonic/copp_cfg.json`; the full file is on the device). Use that block as the structural baseline; your on-switch file may differ slightly (for example the **`default`** object may include **`trap_action`**).
 
 #### Protocol-by-protocol reading of the default map
 
@@ -618,13 +594,13 @@ Daemons:
 
 **Why:** Verification starts from the **authoritative seed** merged into CONFIG_DB. You record **CIR/CBS**, **queues**, **trap_action**, and **which trap_ids share a group** so later Redis checks have a baseline.
 
-- **`cat /etc/sonic/copp_cfg.json`** — Displays the image **CoPP baseline** (compare every field in Steps 3–4 to this file).
+- **`cat /etc/sonic/copp_cfg.json`** — Displays the image **CoPP baseline** (compare merged **`trap_ids`** and policer fields against **Verification Steps 3 and 4**).
 
 ```bash
 cat /etc/sonic/copp_cfg.json
 ```
 
-**Reference output (baseline file; must match your image version):**
+**Reference output (truncated excerpt; must match your image version):** Only a subset of **`COPP_GROUP`** and **`COPP_TRAP`** entries are shown below. Run **`cat /etc/sonic/copp_cfg.json`** on the switch for the **full** policy.
 
 ```json
 {
@@ -657,48 +633,6 @@ cat /etc/sonic/copp_cfg.json
                     "cir":"600",
                     "cbs":"600",
                     "red_action":"drop"
-            },
-            "queue4_group3": {
-                    "trap_action":"trap",
-                    "trap_priority":"4",
-                    "queue": "4",
-                    "meter_type":"packets",
-                    "mode":"sr_tcm",
-                    "cir":"100",
-                    "cbs":"100",
-                    "red_action":"drop"
-            },
-            "queue1_group1": {
-                    "trap_action":"trap",
-                    "trap_priority":"1",
-                    "queue": "1",
-                    "meter_type":"packets",
-                    "mode":"sr_tcm",
-                    "cir":"6000",
-                    "cbs":"6000",
-                    "red_action":"drop"
-            },
-            "queue1_group2": {
-                    "trap_action":"trap",
-                    "trap_priority":"1",
-                    "queue": "1",
-                    "meter_type":"packets",
-                    "mode":"sr_tcm",
-                    "cir":"600",
-                    "cbs":"600",
-                    "red_action":"drop"
-            },
-            "queue2_group1": {
-                    "cbs": "1000",
-                    "cir": "1000",
-                    "genetlink_mcgrp_name": "packets",
-                    "genetlink_name": "psample",
-                    "meter_type": "packets",
-                    "mode": "sr_tcm",
-                    "queue": "2",
-                    "red_action": "drop",
-                    "trap_action": "trap",
-                    "trap_priority": "1"
             }
     },
     "COPP_TRAP": {
@@ -715,36 +649,6 @@ cat /etc/sonic/copp_cfg.json
                     "trap_ids": "arp_req,arp_resp,neigh_discovery",
                     "trap_group": "queue4_group2",
                     "always_enabled": "true"
-            },
-            "lldp": {
-                    "trap_ids": "lldp",
-                    "trap_group": "queue4_group3"
-            },
-            "dhcp_relay": {
-                    "trap_ids": "dhcp,dhcpv6",
-                    "trap_group": "queue4_group3"
-            },
-            "udld": {
-                    "trap_ids": "udld",
-                    "trap_group": "queue4_group3",
-                    "always_enabled": "true"
-            },
-            "ip2me": {
-                    "trap_ids": "ip2me",
-                    "trap_group": "queue1_group1",
-                    "always_enabled": "true"
-            },
-            "macsec": {
-                    "trap_ids": "eapol",
-                    "trap_group": "queue4_group1"
-            },
-            "nat": {
-                    "trap_ids": "src_nat_miss,dest_nat_miss",
-                    "trap_group": "queue1_group2"
-            },
-            "sflow": {
-                    "trap_group": "queue2_group1",
-                    "trap_ids": "sample_packet"
             }
     }
 }
@@ -948,24 +852,26 @@ If **`state`** is not **`ok`**, use **Troubleshooting** (below) before signing o
 
 ### CoPP verification checklist
 
-Complete in order during **standards-based** CoPP health checks or **post-maintenance** validation.
+Run **in order** for **post-change** validation, **upgrade** acceptance, or **incident** sign-off.
 
-- [ ] **Verification Step 1:** **`cat /etc/sonic/copp_cfg.json`** documents expected **`COPP_GROUP`** / **`COPP_TRAP`** names, **CIR/CBS**, and **queues** for the image under audit.
-- [ ] **Verification Step 2:** **`show feature`** shows **swss** **enabled**; **`docker exec -it swss bash`** plus **`ps`** / **`supervisorctl status`** show **orchagent** and **coppmgrd** **RUNNING**.
-- [ ] **Verification Step 3:** **APPL_DB** **`COPP_TABLE:<group>`** hashes match **seed** intent for **`queue4_group1`**, **`queue4_group2`**, **`queue4_group3`**, **`queue1_group1`**, and **`default`** (merged **`trap_ids`**, **cir**, **cbs**, **trap_action**).
-- [ ] **Verification Step 4:** **`grep -i copp /var/log/swss/swss.rec`** shows **`COPP_TABLE:*|SET|...`** lines **consistent** with **Verification Step 3** after the last **reload** / **swss** event.
-- [ ] **Verification Step 5:** **STATE_DB** **`COPP_GROUP_TABLE|<group>`** reports healthy **`state`** (commonly **`ok`**) for representative groups; investigate before signing off if not.
+- [ ] **Verification Step 1** — **`cat /etc/sonic/copp_cfg.json`**: **`COPP_GROUP`** / **`COPP_TRAP`**, **CIR/CBS**, **queues** match this **image**
+- [ ] **Verification Step 2** — **`show feature`**: **swss** **enabled** · **`docker exec -it swss bash`** → **`ps`** / **`supervisorctl`**: **orchagent** + **coppmgrd** **RUNNING**
+- [ ] **Verification Step 3** — **APPL_DB** **`COPP_TABLE:<group>`**: matches seed for **`queue4_group1`**, **`queue4_group2`**, **`queue4_group3`**, **`queue1_group1`**, **`default`** (**`trap_ids`**, **cir**, **cbs**, **trap_action**)
+- [ ] **Verification Step 4** — **`grep -i copp /var/log/swss/swss.rec`**: **`COPP_TABLE`** **`SET`** lines align with **Verification Step 3** after last **reload** / **swss** event
+- [ ] **Verification Step 5** — **STATE_DB** **`COPP_GROUP_TABLE`**: **`state`** healthy (**`ok`** typical) for representative groups; investigate if not
 
 ---
 
 ## Appendix — CoPP vs L3 ACL (operational distinction)
 
-| Topic | CoPP | L3 ACL (ingress/egress port ACL) |
-|--------|------|-----------------------------------|
-| Purpose | **Protect the CPU** from **trap/copy** control-plane and punt classes (**BGP**, **ARP**, **ip2me**, **sFlow** samples, etc.). | **Filter user/data-plane** traffic on **front-panel** interfaces per match criteria. |
-| Typical tables | **`COPP_GROUP`**, **`COPP_TRAP`**, APPL **`COPP_TABLE`**. | **`ACL_TABLE`**, **`ACL_RULE`** (Config DB / APPL_DB per feature). |
-| Policy seed | **`/etc/sonic/copp_cfg.json`** (merged with CONFIG_DB). | JSON fragments / **`config load`** (image-dependent). |
+| Topic | CoPP | L3 ACL (port ACL) |
+|-------|------|-------------------|
+| **Purpose** | **Protect the CPU** — trap / copy classes (**BGP**, **ARP**, **ip2me**, **sFlow** samples, …). | **Filter data-plane** traffic on **front-panel** ports by match criteria. |
+| **Typical tables** | **`COPP_GROUP`**, **`COPP_TRAP`**, APPL **`COPP_TABLE`**. | **`ACL_TABLE`**, **`ACL_RULE`** (Config DB / APPL_DB per feature). |
+| **Policy seed** | **`/etc/sonic/copp_cfg.json`** merged into **CONFIG_DB**. | JSON fragments and **`config load`** (image-dependent). |
 
 ---
 
-*Exercise 1 ACL outputs were transcribed from a lab capture (packet/byte counts vary with traffic). Exercise 2 CoPP excerpts reflect Cisco 8000 SONiC validation. Redis DB indices, ACL IDs, PIDs, and timestamps differ by image—confirm on your target system.*
+### About the sample output
+
+> **Sample output** — **Exercise 1** counters vary with traffic and timing; remove lab **`ACL_DENY`** from **`/etc/sonic/config_db.json`** per runbook when finished. **Exercise 2** excerpts reflect **Cisco 8000** SONiC validation runs. **Redis DB indices**, **ACL IDs**, **PIDs**, and **timestamps** differ by branch—**confirm on your device** before sign-off.
