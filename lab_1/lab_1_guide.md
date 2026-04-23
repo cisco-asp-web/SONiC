@@ -32,6 +32,11 @@ This lab introduces the SONiC (Software for Open Networking in the Cloud) networ
     - [1.7 vXR Emulation Brief](#17-vxr-emulation-brief)
   - [Task 2 — Basic Configuration Circuit](#task-2--basic-configuration-circuit)
     - [2.1 Configuring Users](#21-configuring-users)
+    - [2.2 - eth0 vs Ethernet0 in SONiC](#22---eth0-vs-ethernet0-in-sonic)
+      - [`eth0` vs `Ethernet0` in SONiC](#eth0-vs-ethernet0-in-sonic)
+      - [`eth0` — Management Interface](#eth0--management-interface)
+      - [`Ethernet0` — Data-Plane Front-Panel Port](#ethernet0--data-plane-front-panel-port)
+  - [Side-by-Side Comparison](#side-by-side-comparison)
     - [2.2 Configuring Interface IPv4](#22-configuring-interface-ipv4)
     - [2.3 Configuring Loopback Interface](#23-configuring-loopback-interface)
     - [2.4 Configuring VLANs](#24-configuring-vlans)
@@ -705,11 +710,98 @@ sudo usermod -aG sudo labuser
 cat /etc/passwd | grep labuser
 ```
 
+--- 
+
+### 2.2 - eth0 vs Ethernet0 in SONiC
+
+#### `eth0` vs `Ethernet0` in SONiC
+
+These two interfaces look similar from Linux but belong to **completely different planes** of the switch.
+
+---
+
+#### `eth0` — Management Interface
+
+A standard Linux NIC, fully owned by the kernel. Used for SSH, syslog, NTP, ZTP — any management-plane traffic. Packets **never touch the forwarding ASIC**.
+
+```bash
+admin@pod9-leaf1:~$ ip addr show eth0
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 ...
+    inet 192.168.122.51/24 brd 192.168.122.255 scope global dynamic eth0
+```
+
+Key indicators:
+- `mtu 1500` — standard Ethernet, no jumbo frames needed
+- `state UP` — the Linux kernel owns and reports link state directly
+- DHCP address — typical out-of-band management assignment
+
+---
+
+#### `Ethernet0` — Data-Plane Front-Panel Port
+
+Represents a **physical switch port**. The Linux netdev is a shadow interface — actual packet forwarding runs in the **ASIC** at wire speed. Configuration flows through SONiC's pipeline:
+
+```
+CONFIG_DB → orchagent → syncd → SAI API → ASIC
+```
+
+```bash
+admin@pod9-leaf1:~$ ip addr show Ethernet0
+57: Ethernet0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9100 ...
+    inet 1.4.1.1/24 brd 1.4.1.255 scope global Ethernet0
+```
+
+Key indicators:
+- `mtu 9100` — jumbo frames, standard for data-center fabrics
+- `state UNKNOWN` — the kernel does **not** own link state; the ASIC does
+- Static IP — configured via `CONFIG_DB`, not DHCP
+
+> ⚠️ **`state UNKNOWN` does not mean the port is down.** It means the Linux kernel has no visibility into the hardware link state. Use SONiC tooling for the real status:
+> ```bash
+> show interfaces status Ethernet0
+> sonic-db-cli STATE_DB hgetall "PORT_TABLE|Ethernet0"
+> ```
+
+```bash
+admin@pod9-leaf1:~$ show interfaces status Ethernet0
+  Interface                Lanes    Speed    MTU    FEC    Alias    Vlan    Oper    Admin             Type    Asym PFC
+-----------  -------------------  -------  -----  -----  -------  ------  ------  -------  ---------------  ----------
+  Ethernet0  2304,2305,2306,2307     100G   9100    N/A     etp0  routed      up       up  QSFP28 or later         N/A
+
+admin@pod9-leaf1:~$ sonic-db-cli STATE_DB hgetall "PORT_TABLE|Ethernet0"
+{'state': 'ok', 'netdev_oper_status': 'up', 'admin_status': 'up', 'mtu': '9100', 'supported_speeds': '40000,100000,200000', 'supported_fecs': 'none,rs', 'host_tx_ready': 'true', 'speed': '100000', 'fec': 'rs', 'NPU_SI_SETTINGS_SYNC_STATUS': 'NPU_SI_SETTINGS_NOTIFIED'}
+
+admin@pod9-leaf1:~$ ip addr show Ethernet0
+57: Ethernet0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9100 qdisc fq_codel state UNKNOWN group default qlen 1000
+    link/ether 78:bd:24:f3:b0:00 brd ff:ff:ff:ff:ff:ff
+    inet 1.4.1.1/24 brd 1.4.1.255 scope global Ethernet0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::7abd:24ff:fef3:b000/64 scope link
+       valid_lft forever preferred_lft forever
+```
+
+---
+
+## Side-by-Side Comparison
+
+| Property | `eth0` | `Ethernet0` |
+|---|---|---|
+| Plane | Management | Data / Forwarding |
+| Forwarding | Linux kernel (CPU) | ASIC (wire speed) |
+| Link state authority | Linux kernel | SONiC `STATE_DB` / ASIC |
+| `ip link` state | `UP` / `DOWN` (accurate) | `UNKNOWN` (always) |
+| MTU | 1500 | 9100 (jumbo) |
+| Configuration | DHCP / `/etc/network/interfaces` | `CONFIG_DB` → `orchagent` → SAI |
+| Visible to FRR/BGP? | No (management VRF) | Yes |
+
 ---
 
 ### 2.2 Configuring Interface IPv4
 
-**Run:**
+Topology:
+![drawings/topology-base-view.png](../drawings/topology-base-view.png)
+
+**On Leaf1 Run the following command to configure the uplink towards Spine4:**
 
 ```bash
 sudo config interface ip add Ethernet0 1.4.1.1/24
