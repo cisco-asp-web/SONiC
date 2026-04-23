@@ -560,8 +560,7 @@ Ethernet252      532,533,534,535     100G   9100    N/A    etp63  routed      up
 
 This device has 64x 100GE ports (Ethernet0 through Ethernet252, in steps of 4). Note the `Alias` column — `etp0` through `etp63` are the front-panel port labels. The default MTU is 9100 (jumbo frames) and all ports default to `routed` mode.
 
->\* **Note:** EthernetX port numbering and counts depend on hardware SKU. For example the 8122-64EH-O platform is numbered in steps of 8
-
+>\* **Note:** EthernetX port numbering and counts depend on hardware SKU. For example the 8122-64EH-O platform is numbered in steps of 8 - (8x100G per port)
 ---
 
 ### 1.5 Configuration Methods
