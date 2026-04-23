@@ -7,16 +7,11 @@
 
 This lab introduces the SONiC (Software for Open Networking in the Cloud) network operating system. You will explore the SONiC environment hands-on — login experience, software versioning, Docker-based architecture, platform hardware monitoring, and the three configuration methods (CLI, JSON, and FRR/vtysh). Then you will configure basic networking primitives. By the end of this lab you will have a solid foundation for subsequent labs that build eBGP underlay and VXLAN EVPN overlay fabrics.
 
-**SONiC version:** SONiC.202405cz.2.2.2 (Cisco 8000, FRR 8.5.4)
+**SONiC version used in this lab:** SONiC.202405cz.2.2.2 (Cisco 8000, FRR 8.5.4)
 
 ---
 
 ## Table of Contents
-
-- [Introduction to SONiC \& SONiC Configuration](#introduction-to-sonic--sonic-configuration)
-  - [Lab 1 — 3-Leaf / 1-Spine](#lab-1--3-leaf--1-spine)
-  - [Introduction](#introduction)
-  - [Table of Contents](#table-of-contents)
   - [Lab Objectives](#lab-objectives)
   - [Topology](#topology)
   - [Task 1 — SONiC Hello World](#task-1--sonic-hello-world)
@@ -557,7 +552,7 @@ Ethernet252      532,533,534,535     100G   9100    N/A    etp63  routed      up
 
 This device has 64x 100GE ports (Ethernet0 through Ethernet252, in steps of 4). Note the `Alias` column — `etp0` through `etp63` are the front-panel port labels. The default MTU is 9100 (jumbo frames) and all ports default to `routed` mode.
 
->\* **Note:** EthernetX port numbering and counts depend on hardware SKU. For example the 8122-64EH-O platform is numbered in steps of 8
+>\* **Note:** EthernetX port numbering and counts depend on hardware SKU. SONiC accounts for the SerDes lane on each physical interace. For example the 8122-64H-O platform is numbered in steps of 4. Each 100G interface on the platform has 4 x 25G SerDes which is accounted for in the Lanes column. So each interface increments in steps of 4. 
 
 ---
 
