@@ -60,6 +60,35 @@ ssh leaf3
 ssh spine4
 ```
 
+```diff
+nicmcl@16e461144464:~$ ssh leaf1
+Warning: Permanently added '10.29.209.7' (ED25519) to the list of known hosts.
+Warning: Permanently added '192.168.122.51' (RSA) to the list of known hosts.
+Debian GNU/Linux 12 \n \l
+
++ credentials are "admin/password" for the SONiC devices.
++ admin@192.168.122.51's password: 
+
+Linux pod9-leaf1 6.1.0-11-2-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.38-4 (2023-08-08) x86_64
+You are on
+  ____   ___  _   _ _  ____
+ / ___| / _ \| \ | (_)/ ___|
+ \___ \| | | |  \| | | |
+  ___) | |_| | |\  | | |___
+ |____/ \___/|_| \_|_|\____|
+
+ Software for Open Networking in the Cloud
+
+Unauthorized access and/or use are prohibited.
+All access and/or use are subject to monitoring.
+
+Help:    https://sonic-net.github.io/SONiC/
+
+Last login: Mon Apr 20 06:05:51 2026 from 192.168.122.1
+admin@pod9-leaf1:~$
+
+```
+
 ---
 
 ## Step 3 — Verify Connectivity
