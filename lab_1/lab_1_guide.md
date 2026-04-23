@@ -644,6 +644,8 @@ SONiC supports several reboot strategies with different trade-offs:
 
 > \* **Platform dependency:** `warm-reboot`, `fast-reboot`, and `express-reboot` support depends on platform and ASIC. Express Boot currently requires Cisco 8000 series hardware with SDK-level support.
 
+These reboot comands were provided for reference only, do not reboot your lab unless instructed by your local proctor.
+
 ---
 
 ### 1.7 vXR Emulation Brief
