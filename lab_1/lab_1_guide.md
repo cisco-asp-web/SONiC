@@ -1140,7 +1140,7 @@ ip link show type vrf
     link/ether 96:7e:bf:30:4c:9a brd ff:ff:ff:ff:ff:ff
 ```
 
-> VrfRed would also appear here. Each VRF is a separate `NOARP,MASTER` device that enslaves its member interfaces.
+> VrfRed would also appear here. Each VRF is a separate `NOARP,MASTER` device that binds its member interfaces.
 
 #### Bind Interfaces to a VRF
 
