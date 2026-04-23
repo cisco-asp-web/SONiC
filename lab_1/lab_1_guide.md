@@ -242,6 +242,9 @@ Serial Number: CSNDPBZWVPL
 Model Number: 8102-64H-O
 Hardware Revision: 0.20
 ```
+The platform used in our case is a Cisco 8102-64H-O with 64x100G interfaces.
+
+![alt text](../drawings/pictures/lab_1-8102.png)]
 
 **Run** — Full chassis inventory (chassis, route processors, PSUs, fans, FPDs):
 
