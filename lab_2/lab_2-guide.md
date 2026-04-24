@@ -35,7 +35,9 @@ We will have achieved the following objectives upon completion of Lab 2:
 
 ## Topology
 
+
 <img src="../drawings/topology-bgp-view.png" width="800" />
+
 
 ## Introduction to SONiC BGP and FRR
 
@@ -537,16 +539,24 @@ Run the following on **both Leaf1 and Spine4**:
 vtysh -c 'show bgp ipv4 unicast summary'
 ```
 
+or from the vtysh cli
+
+```bash
+show bgp ipv4 unicast summary
+```
+
+
 **Leaf1** output:
 ```
+pod9-leaf1# show bgp ipv4 unicast summary
 BGP router identifier 1.1.1.1, local AS number 1 vrf-id 0
-BGP table version 21
-RIB entries 17, using 3808 bytes of memory
+BGP table version 10
+RIB entries 19, using 4256 bytes of memory
 Peers 1, using 22 KiB of memory
 Peer groups 1, using 64 bytes of memory
 
 Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
-1.4.1.4         4          4        25        12        0    0    0 00:00:31            8        1 N/A
+1.4.1.4         4          4        65        43        0    0    0 00:34:57            8        1 N/A
 
 Total number of neighbors 1
 ```
@@ -556,16 +566,19 @@ Total number of neighbors 1
 
 **Spine4** output:
 ```
+pod9-spine4# show ip bgp summary
+
+IPv4 Unicast Summary (VRF default):
 BGP router identifier 4.4.4.4, local AS number 4 vrf-id 0
-BGP table version 11
+BGP table version 9
 RIB entries 17, using 3808 bytes of memory
 Peers 3, using 66 KiB of memory
 Peer groups 1, using 64 bytes of memory
 
 Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
-1.4.1.1         4          1        14        27        0    0    0 00:00:38            1        9 N/A
-2.4.1.2         4          2        14        38        0    0    0 00:07:01            1        9 N/A
-3.4.1.3         4          3        17        48        0    0    0 00:07:01            1        9 N/A
+1.4.1.1         4          1        43        67        0    0    0 00:36:51            1        9 N/A
+2.4.1.2         4          2        43        67        0    0    0 00:36:51            1        9 N/A
+3.4.1.3         4          3        43        67        0    0    0 00:36:51            1        9 N/A
 
 Total number of neighbors 3
 ```
@@ -582,6 +595,14 @@ Total number of neighbors 3
 ```bash
 vtysh -c 'show bgp ipv4 unicast'
 ```
+
+or from the vtysh cli
+
+```bash
+show bgp ipv4 unicast 
+```
+
+
 
 **Leaf1** output:
 ```
@@ -623,6 +644,14 @@ Full session details: capabilities, timers, message counters, graceful restart s
 ```bash
 vtysh -c 'show bgp neighbors 1.4.1.4'
 ```
+
+or from vtysh cli
+
+
+```bash
+show bgp neighbors 1.4.1.4
+```
+
 
 **Leaf1** output:
 ```
@@ -678,7 +707,9 @@ Key fields to verify:
 - **Route map for incoming / outgoing** — confirms `PASS` inbound and `ADVERTISE` outbound.
 - **8 accepted prefixes** — matches what `show bgp summary` reports.
 - **Connections established / dropped** — high drop counts indicate instability.
-
+- **End-of-RIB send: IPv4 Unicast / End-of-RIB received: IPv4 Unicast** — both ends have signalled
+  End-of-RIB, meaning initial BGP table convergence is complete on this session. This is the marker FRR
+  uses to exit the BGP initial convergence window.
 ---
 
 ### 4.5 Route-Map Verification
@@ -688,6 +719,13 @@ Shows invocation counts — how many times each route-map was evaluated and how 
 ```bash
 vtysh -c 'show route-map'
 ```
+
+or from vtysh
+
+```bash
+show route-map
+```
+
 
 **Leaf1** output:
 ```
@@ -722,6 +760,12 @@ route-map: PASS Invoked: 16
 vtysh -c 'show ip route'
 ```
 
+or 
+
+```bash
+show ip route
+```
+
 **Leaf1** output:
 ```
 Codes: K - kernel route, C - connected, S - static, R - RIP,
@@ -747,7 +791,10 @@ K>* 240.127.1.0/24 [0/0] is directly connected, docker0, 00:06:40
 
 - `rmapsrc 1.1.1.1` — `RM_SET_SRC` is working, forcing the loopback as the source for BGP-learned routes.
 - `[20/0]` — administrative distance 20 (eBGP), metric 0.
-
+- Two default routes (`0.0.0.0/0`)** — one via `eth0` (192.168.122.1) and one via `eth4`
+  (192.168.123.1). These are management-plane routes, not data-plane. Notice they use `eth0`/`eth4`
+  (OOB interfaces), not `Ethernet0`. They will never be used for BGP forwarding but confirm the
+  management network is reachable. The `K>*` wins over `K *` due to lower administrative distance.
 ---
 
 ### 4.7 Route Programming & Nexthop Resolution — Kernel, APP_DB, and ASIC
@@ -756,7 +803,19 @@ A route in the BGP RIB is useless unless it is programmed all the way down to th
 
 #### Linux Kernel Route Table
 
-The kernel is what actually forwards packets. `proto bgp` confirms FRR (Zebra) programmed the route. The `src` field shows the source address set by `RM_SET_SRC`.
+The kernel is what actually forwards packets. `proto bgp`  confirms FRR (Zebra) programmed the route. The `src` field shows the source address set by `RM_SET_SRC`.
+
+
+This is a fundamentally different view from `show ip route` in `vtysh`. Understanding the distinction is important:
+
+| | `vtysh` — `show ip route` | Linux — `ip route show` |
+|---|---|---|
+| **Owner** | FRR / Zebra RIB | Linux kernel FIB |
+| **What it shows** | All routes FRR knows about | Routes actually used for forwarding |
+| **`proto bgp`** filter | N/A | Filters to routes installed by FRR |
+
+
+Type this command on leaf1 (no on vtysh):
 
 ```bash
 ip route show proto bgp
@@ -770,6 +829,17 @@ ip route show proto bgp
 3.4.1.0/24 via 1.4.1.4 dev Ethernet0 src 1.1.1.1 metric 20
 4.4.4.4 via 1.4.1.4 dev Ethernet0 src 1.1.1.1 metric 20
 ```
+
+Each field tells a precise story:
+
+| Field          | Value             | Meaning                                                                  |
+|----------------|-------------------|--------------------------------------------------------------------------|
+| `proto bgp`    | (filter used)     | Route was installed by FRR Zebra via Netlink — not static, not connected |
+| `via 1.4.1.4`  | Spine4's IP       | Next-hop — all BGP routes on Leaf1 transit Spine4 at this stage          |
+| `dev Ethernet0`| Front-panel port  | Egress interface — confirms the data-plane port, not `eth0`              |
+| `src 1.1.1.1`  | Loopback0 address | Preferred source address set by `RM_SET_SRC`                             |
+| `metric 20`    | eBGP AD           | Administrative distance 20 translated into a kernel metric               |
+
 
 If `src` showed `1.4.1.1` (the Ethernet0 address) instead of `1.1.1.1` (the loopback), the `RM_SET_SRC` route-map is missing or not applied.
 
