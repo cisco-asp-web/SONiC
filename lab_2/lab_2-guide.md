@@ -750,6 +750,31 @@ route-map: PASS Invoked: 16
 - `PASS Invoked 16` — all inbound prefixes passed through.
 - `RM_SET_SRC Invoked 10` — applied to BGP routes installed into the kernel, setting the loopback as source.
 
+`RM_SET_SRC` is a Zebra route-map that instructs FRR to set a **preferred source address** on
+BGP routes when installing them into the Linux kernel FIB. It is configured once, globally,
+and applies to all BGP-learned routes:
+
+```
+ip protocol bgp route-map RM_SET_SRC
+
+route-map RM_SET_SRC permit 10
+ set src 1.1.1.1
+```
+
+Without it, the Linux kernel defaults to using the **egress interface IP** (`1.4.1.1`) as the
+source address for any traffic this device originates toward a BGP-learned destination. This
+works under normal conditions but is fragile — if `Ethernet0` goes down, that source address
+disappears with it.
+
+By setting `src 1.1.1.1` (the loopback), all locally-originated traffic uses a
+**stable, interface-independent address** that remains reachable as long as any path to it
+exists in the fabric. This is standard practice in any BGP-routed data-center fabric and a
+prerequisite for correct behaviour when BGP sessions are later moved to loopback peering.
+
+> 💡 You will see the effect of this route-map in two places as you work through this lab:
+> in `vtysh` as `rmapsrc 1.1.1.1` on each BGP route, and in the Linux kernel as `src 1.1.1.1`
+> in the output of `ip route show proto bgp`.
+
 ---
 
 ### 4.6 FRR IP Route Table
@@ -808,11 +833,11 @@ The kernel is what actually forwards packets. `proto bgp`  confirms FRR (Zebra) 
 
 This is a fundamentally different view from `show ip route` in `vtysh`. Understanding the distinction is important:
 
-| | `vtysh` — `show ip route` | Linux — `ip route show` |
-|---|---|---|
-| **Owner** | FRR / Zebra RIB | Linux kernel FIB |
-| **What it shows** | All routes FRR knows about | Routes actually used for forwarding |
-| **`proto bgp`** filter | N/A | Filters to routes installed by FRR |
+|                        | `vtysh` — `show ip route`  | Linux — `ip route show`             |
+|------------------------|----------------------------|-------------------------------------|
+| **Owner**              | FRR / Zebra RIB            | Linux kernel FIB                    |
+| **What it shows**      | All routes FRR knows about | Routes actually used for forwarding |
+| **`proto bgp`** filter | N/A                        | Filters to routes installed by FRR  |
 
 
 Type this command on leaf1 (no on vtysh):
