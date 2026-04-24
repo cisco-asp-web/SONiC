@@ -96,9 +96,11 @@ Throughout this lab you will use `vtysh` extensively to inspect BGP state, verif
 - Why manually editing `/etc/frr/frr.conf` directly is **not recommended** — `bgpcfgd` will overwrite it
 - Why `docker exec bgp cat /etc/frr/frr.conf` is a useful diagnostic: it shows the exact FRR config that `bgpcfgd` has generated from the database at that moment
 
-#### Verifying the mode 
+### Step 1 — SONiC mode
 
 These commands are different ways to verify the mode (leaf1, leaf2, leaf3, spine4):  
+Please verify the mode on all nodes in the fabric:
+
 
 ```bash
 # Query CONFIG_DB directly — the authoritative source
@@ -112,7 +114,8 @@ docker exec bgp ls /etc/frr/
 docker exec bgp cat /etc/frr/frr.conf
 ```
 
-> 💡 If you see individual files like `bgpd.conf` under `/etc/frr/`, the node is running in legacy `split` mode and `bgpcfgd`-based automation will not work as expected.
+
+Expected: `"docker_routing_config_mode": "split-unified"`
 
 
 If the devices are not running in `split mode` , please run the following:
@@ -253,36 +256,6 @@ zsocket                          EXITED    Apr 24 04:42 AM
 | Ethernet4  | Leaf2       | 2.4.1.4/24  |
 | Ethernet8  | Leaf3       | 3.4.1.4/24  |
 | Loopback0  | —           | 4.4.4.4/32  |
-
----
-
-## Step 1 — Configure Split-Unified Routing Mode
-
-> Run on **all devices**. Required before configuring FRR.
-
-```bash
-cat > /tmp/routing_mode.json << 'EOF'
-{
-    "DEVICE_METADATA": {
-        "localhost": {
-            "docker_routing_config_mode": "split-unified"
-        }
-    }
-}
-EOF
-
-sudo config load /tmp/routing_mode.json -y
-sudo config save -y
-sudo systemctl restart bgp
-```
-
-Verify:
-
-```bash
-show runningconfiguration all | grep docker_routing_config_mode
-```
-
-Expected: `"docker_routing_config_mode": "split-unified"`
 
 ---
 
