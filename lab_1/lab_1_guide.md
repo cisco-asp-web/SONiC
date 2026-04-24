@@ -12,6 +12,10 @@ This lab introduces the SONiC (Software for Open Networking in the Cloud) networ
 ---
 
 ## Table of Contents
+- [Introduction to SONiC \& SONiC Configuration](#introduction-to-sonic--sonic-configuration)
+  - [Lab 1 — 3-Leaf / 1-Spine](#lab-1--3-leaf--1-spine)
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
   - [Lab Objectives](#lab-objectives)
   - [Topology](#topology)
   - [Task 1 — SONiC Hello World](#task-1--sonic-hello-world)
@@ -29,9 +33,9 @@ This lab introduces the SONiC (Software for Open Networking in the Cloud) networ
       - [`eth0` vs `Ethernet0` in SONiC](#eth0-vs-ethernet0-in-sonic)
       - [`eth0` — Management Interface](#eth0--management-interface)
       - [`Ethernet0` — Data-Plane Front-Panel Port](#ethernet0--data-plane-front-panel-port)
+      - [Side-by-Side Comparison](#side-by-side-comparison)
   - [Task 2 — Basic Configuration Circuit](#task-2--basic-configuration-circuit)
     - [2.1 Configuring Users](#21-configuring-users)
-  - [Side-by-Side Comparison](#side-by-side-comparison)
     - [2.2 Configuring Interface IPv4](#22-configuring-interface-ipv4)
     - [2.3 Configuring Loopback Interface](#23-configuring-loopback-interface)
     - [2.4 Configuring VLANs](#24-configuring-vlans)
@@ -738,6 +742,17 @@ admin@pod9-leaf1:~$ ip addr show Ethernet0
        valid_lft forever preferred_lft forever
 ```
 
+#### Side-by-Side Comparison
+
+| Property | `eth0` | `Ethernet0` |
+|---|---|---|
+| Plane | Management | Data / Forwarding |
+| Forwarding | Linux kernel (CPU) | ASIC (wire speed) |
+| Link state authority | Linux kernel | SONiC `STATE_DB` / ASIC |
+| `ip link` state | `UP` / `DOWN` (accurate) | `UNKNOWN` (always) |
+| MTU | 1500 | 9100 (jumbo) |
+| Configuration | DHCP / `/etc/network/interfaces` | `CONFIG_DB` → `orchagent` → SAI |
+| Visible to FRR/BGP? | No (management VRF) | Yes |
 
 ## Task 2 — Basic Configuration Circuit
 
@@ -772,22 +787,6 @@ sudo usermod -aG sudo labuser
 cat /etc/passwd | grep labuser
 ```
 
---- 
-
-
----
-
-## Side-by-Side Comparison
-
-| Property | `eth0` | `Ethernet0` |
-|---|---|---|
-| Plane | Management | Data / Forwarding |
-| Forwarding | Linux kernel (CPU) | ASIC (wire speed) |
-| Link state authority | Linux kernel | SONiC `STATE_DB` / ASIC |
-| `ip link` state | `UP` / `DOWN` (accurate) | `UNKNOWN` (always) |
-| MTU | 1500 | 9100 (jumbo) |
-| Configuration | DHCP / `/etc/network/interfaces` | `CONFIG_DB` → `orchagent` → SAI |
-| Visible to FRR/BGP? | No (management VRF) | Yes |
 
 ---
 
