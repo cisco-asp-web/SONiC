@@ -6,20 +6,16 @@ We use FRR (Free Range Routing) as the routing stack on SONiC to build a fully f
 - [Lab Objectives](#lab-objectives)
 - [Topology](#topology)
 - [Introduction to SONiC BGP and FRR](#introduction-to-sonic-bgp-and-frr)
-- [BGP Deep Dive](#bgp-deep-dive)
-  - [BGP Finite State Machine](#bgp-finite-state-machine)
-  - [BGP Message Types](#bgp-message-types)
-  - [BGP Path Attributes](#bgp-path-attributes)
-  - [BGP Best Path Selection Algorithm](#bgp-best-path-selection-algorithm)
-  - [FRR Internal Architecture and IPC](#frr-internal-architecture-and-ipc)
-  - [The SONiC BGP Route Pipeline](#the-sonic-bgp-route-pipeline)
-  - [Understanding Each FRR Configuration Knob](#understanding-each-frr-configuration-knob)
-- [SONiC Interface Configuration and Verification](#sonic-interface-configuration-and-verification)
-- [Build a Leaf-Spine BGP Fabric](#build-a-leaf-spine-bgp-fabric)
-- [BGP Configuration using SONiC and FRR](#bgp-configuration-using-sonic-and-frr)
-- [BGP Verification](#bgp-verification)
-- [Redis Database Verification](#redis-database-verification)
-- [End of Lab 2](#end-of-lab-2)
+  - [What is FRR?](#what-is-frr)
+  - [FRR and SONiC Integration — Split-Unified Mode](#frr-and-sonic-integration--split-unified-mode)
+  - [The vtysh Shell](#the-vtysh-shell)
+  - [Verify FRR Container is Running](#verify-frr-container-is-running)
+- [Device Addressing](#device-addressing)
+- [Step 1 — Configure Split-Unified Routing Mode](#step-1--configure-split-unified-routing-mode)
+- [Step 2 — Interface IPs](#step-2--interface-ips)
+- [Step 3 — Underlay BGP Configuration](#step-3--underlay-bgp-configuration)
+- [Step 4 — Extensive Verification](#step-4--extensive-verification)
+- [BGP Logging & Debug](#bgp-logging--debug)
 
 ## Lab Objectives
 
@@ -37,46 +33,8 @@ We will have achieved the following objectives upon completion of Lab 2:
 
 ## Topology
 
-For Labs 1–6 you are using a single shared topology. The four SONiC nodes running on Cisco 8000 Emulator form a two-tier fabric with host containers attached to each leaf.
 
-```
-                    ┌──────────────────────────────┐
-                    │           spine-01            │
-                    │            AS 65000           │
-                    │      Loopback: 4.4.4.4/32     │
-                    │   Loopback: fc00:0:4::1/128   │
-                    └────────┬──────────┬───────────┘
-                             │          │           │
-                   Eth0      │    Eth8  │    Eth16  │
-              10.1.1.1/31    │  10.1.1.3/31  10.1.1.5/31
-         2001:db8:1:1::1/127 │  2001:db8:1:1::3/127   2001:db8:1:1::5/127
-                             │          │           │
-              10.1.1.0/31    │  10.1.1.2/31  10.1.1.4/31
-         2001:db8:1:1::0/127 │  2001:db8:1:1::2/127   2001:db8:1:1::4/127
-                   Eth0      │    Eth0  │    Eth0   │
-          ┌──────────────────┘          │           └──────────────────┐
-          │                             │                              │
- ┌────────┴──────┐            ┌─────────┴─────┐             ┌─────────┴─────┐
- │    leaf-01    │            │    leaf-02    │             │    leaf-03    │
- │   AS 65001    │            │   AS 65002    │             │   AS 65003    │
- │  1.1.1.1/32   │            │  2.2.2.2/32   │             │  3.3.3.3/32   │
- └──────┬────────┘            └──┬────────┬───┘             └───────┬───────┘
-        │  Eth8                  │Eth8    │Eth16                    │Eth8
-        │                        │        │                          │
-     host-01                  host-01  host-02                   host-03
-    (eth1)                    (eth2)   (eth1)                    (eth1)
-```
-
-> **Note:** host-01 is dual-homed to both leaf-01 and leaf-02, providing redundant connectivity.
-
-### Management Access
-
-| Device   | Management IP  | SSH Command                 |
-|----------|----------------|-----------------------------|
-| leaf-01  | 172.20.2.100   | `ssh cisco@172.20.2.100`    |
-| leaf-02  | 172.20.2.101   | `ssh cisco@172.20.2.101`    |
-| leaf-03  | 172.20.2.102   | `ssh cisco@172.20.2.102`    |
-| spine-01 | 172.20.2.103   | `ssh cisco@172.20.2.103`    |
+![drawings/topology-base-view.png](../drawings/topology-bgp-view.png)
 
 
 ## Introduction to SONiC BGP and FRR
@@ -100,12 +58,12 @@ FRR consists of a set of daemons, each responsible for a specific protocol:
 
 <img src="../drawings/frr-bgp-framework.png" width="800" />
 
-### FRR and SONiC Integration — Split Mode
+### FRR and SONiC Integration — Split-Unified Mode
 
-SONiC supports multiple routing configuration modes. This lab uses **`split` mode**, set by the `docker_routing_config_mode` field in `DEVICE_METADATA`:
+As explained briefly in Lab 1, SONiC supports multiple routing configuration modes. This lab uses **`split-unified` mode**, set by the `docker_routing_config_mode` field in `DEVICE_METADATA`:
 
 ```json
-"docker_routing_config_mode": "split"
+"docker_routing_config_mode": "split-unified"
 ```
 
 In `split` mode:
@@ -119,16 +77,15 @@ In `split` mode:
 
 ### The vtysh Shell
 
-`vtysh` is the FRR unified command shell. It provides a single CLI interface across all FRR daemons using IOS-like syntax. You run it as root:
+`vtysh` is the FRR unified command shell. It provides a single CLI interface across all FRR daemons using IOS-like syntax. You run it as root and once inside vtysh you will see a prompt with the device hostname:
 
 ```
-cisco@leaf-01:~$ sudo vtysh
-```
+admin@pod9-leaf1:~$ vtysh
 
-Once inside vtysh you will see a prompt with the device hostname:
+Hello, this is FRRouting (version 8.5.4).
+Copyright 1996-2005 Kunihiro Ishiguro, et al.
 
-```
-leaf-01#
+pod9-leaf1#
 ```
 
 Key vtysh commands:
@@ -150,1891 +107,1054 @@ Key vtysh commands:
 Before configuring BGP, confirm the FRR BGP container is running on each device:
 
 ```
-cisco@leaf-01:~$ docker ps | grep bgp
+admin@pod9-leaf1:~$ docker ps | grep bgp
 ```
 
 Expected output:
 ```
-a3f92b1c8d45   docker-sonic-frr:latest   "/usr/bin/supervisord"   2 hours ago   Up 2 hours   bgp
+9315128bc995   docker-fpm-frr:latest                "/usr/bin/docker_ini…"   4 days ago   Up 46 minutes             bgp
 ```
 
 You can also check the FRR daemon status from inside the container:
 
 ```
-cisco@leaf-01:~$ docker exec -it bgp supervisorctl status
+docker exec -it bgp supervisorctl status
 ```
 
 Expected output:
 ```
-bgpd                             RUNNING   pid 2847, uptime 2:14:22
-zebra                            RUNNING   pid 2846, uptime 2:14:22
-staticd                          RUNNING   pid 2848, uptime 2:14:22
-fpmsyncd                         RUNNING   pid 2849, uptime 2:14:22
+bfdd                             RUNNING   pid 70, uptime 0:47:16
+bfdsyncd                         RUNNING   pid 57, uptime 0:47:17
+bgpcfgd                          RUNNING   pid 58, uptime 0:47:17
+bgpd                             RUNNING   pid 50, uptime 0:47:17
+bgpmon                           RUNNING   pid 60, uptime 0:47:17
+dependent-startup                EXITED    Apr 24 04:42 AM
+fpmsyncd                         RUNNING   pid 61, uptime 0:47:17
+ports_frr_notify                 EXITED    Apr 24 04:42 AM
+rsyslogd                         RUNNING   pid 30, uptime 0:47:19
+staticd                          RUNNING   pid 49, uptime 0:47:17
+staticrouteapm                   RUNNING   pid 62, uptime 0:47:17
+staticroutebfd                   RUNNING   pid 63, uptime 0:47:17
+supervisor-proc-exit-listener    RUNNING   pid 27, uptime 0:47:21
+vtysh_b                          EXITED    Apr 24 04:42 AM
+zebra                            RUNNING   pid 34, uptime 0:47:19
+zsocket                          EXITED    Apr 24 04:42 AM
 ```
 
-
-## BGP Deep Dive
-
-This section covers the internals of BGP and FRR in detail. Understanding these concepts will make the configuration tasks in this lab intuitive rather than mechanical, and will equip you to diagnose real-world BGP issues.
 
 ---
 
-### BGP Finite State Machine
+## Device Addressing
 
-Every BGP session progresses through a well-defined set of states before it becomes operational. This Finite State Machine (FSM) is defined in RFC 4271. FRR implements it exactly. Understanding the FSM is critical for troubleshooting — when a session is stuck in a given state, that state tells you precisely what is failing.
+| Device | AS | Loopback   | Ethernet0    | Spine4-facing IP |
+|--------|----|------------|--------------|------------------|
+| Spine4 | 4  | 4.4.4.4/32 | —            | —                |
+| Leaf1  | 1  | 1.1.1.1/32 | 1.4.1.1/24   | 1.4.1.4/24       |
+| Leaf2  | 2  | 2.2.2.2/32 | 2.4.1.2/24   | 2.4.1.4/24       |
+| Leaf3  | 3  | 3.3.3.3/32 | 3.4.1.3/24   | 3.4.1.4/24       |
 
-```
-  ┌──────────────────────────────────────────────────────────────┐
-  │                    BGP Finite State Machine                  │
-  │                                                              │
-  │   [Idle] ──ManualStart──► [Connect] ──TCP OK──► [OpenSent]  │
-  │      ▲                        │                     │        │
-  │      │                   TCP Fail               OPEN rcvd    │
-  │      │                        │                     │        │
-  │      │                        ▼                     ▼        │
-  │      │                   [Active] ◄──────── [OpenConfirm]    │
-  │      │                        │                     │        │
-  │   HoldTimer                TCP OK             KEEPALIVE rcvd │
-  │   Expire /              [OpenSent]                  │        │
-  │   Error                                             ▼        │
-  │      │                                        [Established]  │
-  │      └────────────────────────────────────────────┘          │
-  └──────────────────────────────────────────────────────────────┘
-```
+### Spine4 Interface Map
 
-#### State Descriptions
-
-**Idle**
-The initial state. BGP refuses all incoming connections and makes no outgoing connections. BGP enters Idle when:
-- The process just started
-- A TCP connection attempt failed (ConnectRetry timer is running)
-- A Notification was received or sent
-- The hold timer expired
-
-In FRR, a peer stuck in `Idle` is often caused by a routing policy issue (`ebgp-requires-policy`), a missing route to the neighbor, or an administrative shutdown. Check with:
-```
-cisco@leaf-01:~$ show bgp neighbors 10.1.1.1 | grep "BGP state"
-```
-
-**Connect**
-BGP is waiting for the TCP three-way handshake to complete. FRR has initiated a TCP SYN to the neighbor's port 179. If the connection succeeds, BGP moves to OpenSent. If it fails, BGP moves to Active.
-
-A peer stuck in `Connect` usually means:
-- TCP port 179 is firewalled
-- The neighbor IP is unreachable (check the routing table)
-- The remote end has no BGP process listening
-
-**Active**
-BGP is actively trying to initiate a TCP connection. The distinction between Connect and Active is subtle: in Connect, BGP is waiting on one specific TCP attempt; in Active, BGP is retrying after a failure, backing off with the ConnectRetry timer.
-
-A peer stuck in `Active` usually means the TCP connection keeps failing. Verify with:
-```
-cisco@leaf-01:~$ sudo tcpdump -i Ethernet0 tcp port 179
-```
-
-**OpenSent**
-TCP is established. BGP has sent an OPEN message to the peer and is waiting to receive the peer's OPEN message in return. OPEN messages contain: BGP version, local AS number, hold time proposal, and BGP Identifier (router-ID).
-
-If the peer's OPEN is rejected (wrong ASN, incompatible hold time, duplicate router-ID), a NOTIFICATION is sent and the session drops back to Idle.
-
-**OpenConfirm**
-Both OPEN messages have been received and validated. BGP has sent a KEEPALIVE to acknowledge the OPEN and is waiting for the peer's KEEPALIVE. Once the peer's KEEPALIVE arrives, the session moves to Established.
-
-**Established**
-The BGP session is fully operational. BGP can now exchange UPDATE messages carrying routing information. KEEPALIVE messages are exchanged at the keepalive interval (default 60s in vanilla BGP, but FRR defaults to 3s hold / 1s keepalive for fast convergence in data center designs).
-
-The hold timer is negotiated during OPEN — both peers propose a hold time and the lower value is used. If no KEEPALIVE or UPDATE is received within the hold time, the session is torn down.
-
-#### Session Timers in FRR
-
-| Timer          | Default (FRR) | Purpose                                             |
-|----------------|---------------|-----------------------------------------------------|
-| Connect Retry  | 120s          | Delay between TCP reconnect attempts                |
-| Hold Time      | 9s            | Max time without KEEPALIVE before session tears down |
-| Keepalive      | 3s            | Frequency of KEEPALIVE messages (1/3 of hold time) |
-| Advertisement  | 0s (eBGP)     | Min time between UPDATE messages to a peer          |
-
-> **FRR vs traditional BGP:** Standard BGP (RFC 4271) uses 90s keepalive / 270s hold time. FRR's defaults (3s/9s) are tuned for data center environments where fast failure detection matters more than message overhead.
+| Interface  | Connects to | IP          |
+|------------|-------------|-------------|
+| Ethernet0  | Leaf1       | 1.4.1.4/24  |
+| Ethernet4  | Leaf2       | 2.4.1.4/24  |
+| Ethernet8  | Leaf3       | 3.4.1.4/24  |
+| Loopback0  | —           | 4.4.4.4/32  |
 
 ---
 
-### BGP Message Types
+## Step 1 — Configure Split-Unified Routing Mode
 
-BGP uses four message types, all carried over TCP port 179. Every message starts with a 19-byte common header: 16 bytes of marker (all 0xFF, for legacy authentication detection), 2 bytes of length, and 1 byte of type.
+> Run on **all devices**. Required before configuring FRR.
 
-#### OPEN (Type 1)
-
-Sent immediately after TCP is established. Contains:
-
-| Field              | Size     | Description                                              |
-|--------------------|----------|----------------------------------------------------------|
-| Version            | 1 byte   | Always 4 (BGP-4)                                         |
-| My Autonomous System | 2 bytes | Local AS number (or AS 23456 for 4-byte AS via capability) |
-| Hold Time          | 2 bytes  | Proposed hold timer in seconds                           |
-| BGP Identifier     | 4 bytes  | Router-ID (must be unique in the AS)                    |
-| Optional Parameters | variable | BGP capabilities advertised (4-byte AS, AddPath, etc.)  |
-
-Key capabilities negotiated in OPEN (visible in `show bgp neighbors`):
-- **4-Byte AS Number** (RFC 6793) — allows ASNs above 65535
-- **Route Refresh** (RFC 2918) — allows requesting a fresh BGP table without session reset
-- **Multiprotocol Extensions** (RFC 4760) — enables IPv6 (AFI=2, SAFI=1) and other address families
-- **AddPath** (RFC 7911) — allows advertising multiple paths for the same prefix
-
-#### UPDATE (Type 2)
-
-The most complex message type. Carries route advertisements and withdrawals:
-
-```
-UPDATE message structure:
-┌─────────────────────────────────────┐
-│  Unfeasible Routes Length (2 bytes) │  ← length of withdrawn routes
-├─────────────────────────────────────┤
-│  Withdrawn Routes (variable)        │  ← list of prefixes to withdraw
-├─────────────────────────────────────┤
-│  Total Path Attribute Length        │  ← length of path attributes
-├─────────────────────────────────────┤
-│  Path Attributes (variable)         │  ← AS_PATH, NEXT_HOP, MED, etc.
-├─────────────────────────────────────┤
-│  NLRI (variable)                    │  ← prefixes being advertised
-└─────────────────────────────────────┘
-```
-
-A single UPDATE can carry:
-- Withdrawals only (NLRI is empty)
-- New routes only (withdrawn routes length is 0)
-- Both withdrawals and new routes simultaneously
-
-In FRR, you can trigger an UPDATE refresh with:
-```
-cisco@leaf-01:~$ sudo vtysh -c "clear bgp 10.1.1.1 soft"
-```
-This requests a Route Refresh (soft reset) — the peer resends its full table without tearing down the session.
-
-#### KEEPALIVE (Type 3)
-
-A minimal 19-byte message (just the header). Sent to confirm the session is alive within the hold time. No payload — the presence of the message is the signal.
-
-FRR sends a KEEPALIVE in response to an OPEN (to move to Established) and then periodically at the keepalive interval.
-
-#### NOTIFICATION (Type 4)
-
-Sent when an error is detected. Immediately closes the TCP connection after sending. Contains:
-- Error Code (1 byte)
-- Error Subcode (1 byte)
-- Data (variable — the offending message or field)
-
-Common Error Codes and their meaning:
-
-| Code | Subcode | Meaning                             | Common Cause                          |
-|------|---------|-------------------------------------|---------------------------------------|
-| 1    | 2       | Unsupported version number          | Peer running BGP-3 (extremely rare)   |
-| 1    | 2       | Bad peer AS                         | `remote-as` mismatch                  |
-| 1    | 3       | Bad BGP Identifier                  | Duplicate router-ID in iBGP          |
-| 2    | 2       | Unrecognized attribute              | Attribute type not understood         |
-| 2    | 3       | Missing well-known attribute        | AS_PATH or NEXT_HOP absent            |
-| 3    | 1       | Hold Timer Expired                  | Missed 3 consecutive KALIVEs         |
-| 6    | 2       | Administrative shutdown             | `neighbor X shutdown` configured      |
-| 6    | 3       | Peer de-configured                  | Neighbor removed from config          |
-
-In FRR, NOTIFICATION events are logged. Check the BGP log:
-```
-cisco@leaf-01:~$ docker exec bgp tail -f /var/log/frr/bgpd.log
-```
-
----
-
-### BGP Path Attributes
-
-Path attributes are carried in UPDATE messages and describe the properties of the advertised prefixes. They are the mechanism through which BGP makes routing decisions and implements policy.
-
-#### Attribute Categories
-
-BGP attributes are classified along two axes:
-
-**Well-known vs Optional:**
-- **Well-known**: Every BGP implementation must recognize these attributes
-- **Optional**: Implementations may not understand them (and must handle them gracefully)
-
-**Mandatory vs Discretionary (for well-known) / Transitive vs Non-transitive (for optional):**
-- **Mandatory**: Must be present in every UPDATE that advertises a route
-- **Discretionary**: May be omitted
-- **Transitive**: If an optional attribute is not recognized, it is still forwarded to other peers
-- **Non-transitive**: If not recognized, the attribute is silently dropped
-
-#### Key Attributes Used in This Lab
-
-**ORIGIN (Type 1)** — Well-known Mandatory
-Indicates how the prefix entered BGP:
-- `i` (IGP) — injected via `network` statement (used in this lab)
-- `e` (EGP) — learned from the old EGP protocol (legacy, not used)
-- `?` (Incomplete) — redistributed from another protocol (e.g., OSPF → BGP)
-
-In FRR output: `Origin IGP` = `i`. The `network` command in this lab sets Origin to IGP.
-
-**AS_PATH (Type 2)** — Well-known Mandatory
-An ordered list of AS numbers that the route has traversed. This is BGP's primary loop prevention mechanism.
-
-When a BGP router receives an UPDATE:
-1. It checks if its own AS number appears in the AS_PATH
-2. If yes → loop detected → route is silently discarded
-3. If no → route is accepted, and the local AS is prepended before the route is forwarded
-
-In this lab, when spine-01 (AS 65000) receives `1.1.1.1/32` from leaf-01 (AS 65001), it sees `AS_PATH = [65001]`. When it advertises this to leaf-02 (AS 65002), it prepends its own ASN: `AS_PATH = [65000, 65001]`. Leaf-02 accepts it because neither 65002 nor any loop exists in the path.
-
-**NEXT_HOP (Type 3)** — Well-known Mandatory
-The IP address of the next-hop router for this prefix.
-
-For eBGP: the NEXT_HOP is always set to the IP address of the advertising router's interface on the link between the two peers. Leaf-01 (10.1.1.0) advertises `1.1.1.1/32` to spine-01 with NEXT_HOP = 10.1.1.0. The spine then advertises this to leaf-02 with NEXT_HOP = 10.1.1.1 (its own address toward leaf-02's link — because eBGP changes the NEXT_HOP at each hop).
-
-> **iBGP vs eBGP NEXT_HOP behavior:** In iBGP, the NEXT_HOP is NOT changed. This is why iBGP requires either a full mesh or a Route Reflector — every router must have a route to the NEXT_HOP. In eBGP (used in this lab), the NEXT_HOP is always updated.
-
-**MULTI_EXIT_DISC / MED (Type 4)** — Optional Non-transitive
-A hint to external neighbors about the preferred entry point into an AS when there are multiple links. Lower MED is preferred. Only compared between routes from the same neighboring AS. Not propagated beyond the next AS.
-
-**LOCAL_PREF (Type 5)** — Well-known Discretionary (iBGP only)
-Used within an AS to indicate the preferred exit path. Higher LOCAL_PREF is preferred. Not sent to eBGP peers. Since this lab uses only eBGP, LOCAL_PREF is not relevant here — but FRR will set it to the default value of 100 on all received routes.
-
-**COMMUNITY (Type 8)** — Optional Transitive
-32-bit values attached to routes to carry policy tags. Commonly used for route filtering and traffic engineering. Format: `ASN:value` (e.g., `65000:100`). Standard communities include:
-- `no-export` (0xFFFFFF01): Do not advertise outside the local AS
-- `no-advertise` (0xFFFFFF02): Do not advertise to any peer
-
-**ATOMIC_AGGREGATE (Type 6) and AGGREGATOR (Type 7)**
-Used when route aggregation is performed. Not relevant in this lab.
-
-#### Attribute Summary Table
-
-| Type | Name           | Category                    | Used in this lab |
-|------|----------------|-----------------------------|-----------------|
-| 1    | ORIGIN         | Well-known Mandatory        | Yes (IGP)       |
-| 2    | AS_PATH        | Well-known Mandatory        | Yes             |
-| 3    | NEXT_HOP       | Well-known Mandatory        | Yes             |
-| 4    | MED            | Optional Non-transitive     | No              |
-| 5    | LOCAL_PREF     | Well-known Discretionary    | Implicit (100)  |
-| 6    | ATOMIC_AGGR    | Well-known Discretionary    | No              |
-| 7    | AGGREGATOR     | Optional Transitive         | No              |
-| 8    | COMMUNITY      | Optional Transitive         | No              |
-| 9    | ORIGINATOR_ID  | Optional Non-transitive     | No (iBGP RR)    |
-| 10   | CLUSTER_LIST   | Optional Non-transitive     | No (iBGP RR)    |
-| 14   | MP_REACH_NLRI  | Optional Non-transitive     | Yes (IPv6)      |
-| 15   | MP_UNREACH_NLRI| Optional Non-transitive     | Yes (IPv6)      |
-
-> **MP_REACH_NLRI and MP_UNREACH_NLRI** are how IPv6 (and other address families) are carried in BGP UPDATE messages. The base BGP UPDATE format only has fields for IPv4 NLRI — all other address families are carried in these extension attributes. This is why you must explicitly activate IPv6 with `address-family ipv6 unicast` in FRR.
-
----
-
-### BGP Best Path Selection Algorithm
-
-When BGP receives multiple paths to the same prefix from different peers, it must select exactly one **best path** to install in the routing table (and one to advertise to peers). FRR implements the standard BGP decision process in the order below. The first criterion that produces a winner stops the evaluation.
-
-This is evaluated **per-prefix** every time a new path is received or an existing path is withdrawn.
-
-```
-Step  1: Is the NEXT_HOP reachable?         → Unreachable paths are invalid, skip them
-Step  2: Prefer highest WEIGHT              → FRR/Cisco proprietary, local significance only
-Step  3: Prefer highest LOCAL_PREF         → iBGP only; all eBGP paths get LOCAL_PREF 100
-Step  4: Prefer locally originated routes  → network/aggregate/redistribute > eBGP > iBGP
-Step  5: Prefer shortest AS_PATH           → Fewer AS hops = better
-Step  6: Prefer lowest ORIGIN code         → IGP (i) < EGP (e) < Incomplete (?)
-Step  7: Prefer lowest MED                 → Only compared if paths are from the same AS
-Step  8: Prefer eBGP over iBGP            → External routes preferred over internal
-Step  9: Prefer lowest IGP metric to NH   → Prefer the path whose next-hop is closest
-Step 10: Prefer oldest eBGP path          → Stability: avoid flapping (if enabled)
-Step 11: Prefer lowest BGP Router-ID      → Tiebreak: prefer peer with lowest router-ID
-Step 12: Prefer shortest Cluster List     → iBGP Route Reflector tiebreak
-Step 13: Prefer lowest neighbor address   → Final tiebreak: lowest peer IP wins
-```
-
-#### How This Applies to Our Lab
-
-In our fabric, leaf-01 receives only **one path** to 2.2.2.2/32 (via spine-01). No tie-breaking is needed. But on spine-01, consider what happens as more prefixes are added in later labs — the path selection becomes critical.
-
-**Key step for our fabric: Step 5 (AS_PATH length)**
-
-Leaf-01 seeing `2.2.2.2/32`:
-- Path via spine-01: AS_PATH = `[65000, 65002]` — length 2
-
-There is only one path, so it wins. But in a dual-spine design (future lab), both spines would advertise the same prefix with equal AS_PATH length. The decision would fall to Step 13 (lowest neighbor IP), which is deterministic but may not match your traffic engineering intent. This is where `bgp bestpath as-path multipath-relax` and `maximum-paths` become essential.
-
-#### ECMP and `bgp bestpath as-path multipath-relax`
-
-By default, BGP only installs multiple paths when they have **identical** AS_PATH. In our fabric, if spine-01 and a hypothetical spine-02 both advertise `2.2.2.2/32`, the paths look like:
-- Via spine-01 (AS 65000): AS_PATH = `[65000, 65002]`
-- Via spine-02 (AS 65100): AS_PATH = `[65100, 65002]`
-
-These AS_PATHs are different — so without the multipath-relax knob, only one path would be installed and load-balancing would not occur.
-
-`bgp bestpath as-path multipath-relax` tells FRR: "ignore AS_PATH differences when evaluating multipath eligibility — only require equal AS_PATH **length**." With this knob, both spine paths above are ECMP candidates (length 2 = length 2).
-
-`maximum-paths 64` then allows up to 64 equal-cost paths to be installed simultaneously in the FIB, enabling hardware-level ECMP hashing across all equal-cost next-hops.
-
----
-
-### FRR Internal Architecture and IPC
-
-Understanding how FRR daemons communicate internally clarifies what actually happens when you type a `vtysh` command.
-
-#### The ZAPI Protocol
-
-FRR daemons communicate using **ZAPI** (Zebra API), a private binary protocol over Unix domain sockets. Each protocol daemon (bgpd, ospfd, etc.) maintains a persistent ZAPI connection to zebra.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    FRR Process Model                    │
-│                                                         │
-│  ┌─────────┐    ZAPI socket    ┌────────┐              │
-│  │  bgpd   │◄──────────────────►│        │              │
-│  └─────────┘                   │        │  Netlink      │
-│                                │ zebra  │◄─────────────►│ Linux Kernel │
-│  ┌─────────┐    ZAPI socket    │        │              │
-│  │ staticd │◄──────────────────►│        │              │
-│  └─────────┘                   └────────┘              │
-│                                                         │
-│  ┌─────────┐    Unix socket                             │
-│  │  vtysh  │◄────────────────── to each daemon          │
-│  └─────────┘                                            │
-└─────────────────────────────────────────────────────────┘
-```
-
-**What bgpd sends to zebra via ZAPI:**
-- `ZEBRA_ROUTE_ADD` — install a BGP-learned route into the kernel
-- `ZEBRA_ROUTE_DELETE` — remove a route
-- `ZEBRA_REDISTRIBUTE_ADD` — request redistribution of connected/static routes into BGP
-- `ZEBRA_NEXTHOP_REGISTER` — register a next-hop for tracking (NHT)
-
-**What zebra sends to bgpd via ZAPI:**
-- `ZEBRA_NEXTHOP_UPDATE` — a tracked next-hop's reachability changed
-- `ZEBRA_REDISTRIBUTE_ROUTE_ADD` — a redistributed route is available
-
-#### vtysh Architecture
-
-`vtysh` is not a daemon — it is a **client program** that connects to each running FRR daemon over per-daemon Unix sockets (typically in `/var/run/frr/`). When you type `show bgp summary` in vtysh:
-
-1. vtysh sends the command string to `bgpd`'s Unix socket
-2. `bgpd` processes the command, formats the output
-3. `bgpd` sends the formatted text back to vtysh
-4. vtysh prints it to your terminal
-
-When you type `show ip route` in vtysh, vtysh sends it to `zebra` instead. When a command affects multiple daemons (like `show running-config`), vtysh fans the command out to all daemons and concatenates the results.
-
-This is why `vtysh` requires `sudo` — it needs permission to access the privileged Unix sockets owned by the FRR daemons.
-
-#### How a BGP Route Gets Installed
-
-Here is the exact sequence of events when leaf-01 learns `2.2.2.2/32` from spine-01:
-
-```
-1. bgpd receives TCP segment on port 179 from spine-01
-2. bgpd parses the BGP UPDATE message
-3. bgpd extracts the NLRI (2.2.2.2/32) and path attributes
-4. bgpd runs the Best Path Selection Algorithm
-5. 2.2.2.2/32 is selected as best path (only path)
-6. bgpd sends ZEBRA_ROUTE_ADD to zebra via ZAPI
-   → prefix: 2.2.2.2/32, nexthop: 10.1.1.1, ifindex: Ethernet0
-7. zebra validates the next-hop (10.1.1.1 is reachable via Ethernet0)
-8. zebra calls rtnetlink (Netlink) to install the route in the Linux kernel
-   → ip route add 2.2.2.2/32 via 10.1.1.1 dev Ethernet0 proto bgp
-9. fpmsyncd (running inside the bgp container) reads the Netlink route event
-10. fpmsyncd writes to Redis APPL_DB: ROUTE_TABLE:2.2.2.2/32
-11. orchagent (in the swss container) reads from APPL_DB
-12. orchagent translates the route to SAI (Switch Abstraction Interface) calls
-13. SAI driver programs the route into the hardware ASIC FIB
-```
-
-You can observe this pipeline step by step:
 ```bash
-# Step 6-8: Verify the route in the Linux kernel
-cisco@leaf-01:~$ ip route show 2.2.2.2/32
-
-# Step 10: Verify in Redis APPL_DB
-cisco@leaf-01:~$ redis-cli -n 0 hgetall "ROUTE_TABLE:2.2.2.2/32"
-
-# Step 12-13: Verify in ASIC_DB (the SAI route object)
-cisco@leaf-01:~$ redis-cli -n 1 keys "ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:*2.2.2.2*"
-```
-
----
-
-### The SONiC BGP Route Pipeline
-
-The complete route programming pipeline in SONiC involves multiple containers and processes:
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                      SONiC BGP Container                        │
-│                                                                  │
-│   ┌────────┐  ZAPI  ┌────────┐  Netlink  ┌──────────────────┐  │
-│   │  bgpd  │◄──────►│ zebra  │──────────►│  Linux Kernel    │  │
-│   └────────┘        └────────┘           │  Route Table     │  │
-│                                          └────────┬─────────┘  │
-│                     ┌──────────┐                  │            │
-│                     │fpmsyncd  │◄─── Netlink ──────┘            │
-│                     └────┬─────┘  (route events)               │
-└──────────────────────────┼───────────────────────────────────────┘
-                           │ Redis APPL_DB
-                           │ ROUTE_TABLE write
-                           ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                      SONiC SWSS Container                       │
-│                                                                  │
-│   ┌──────────┐  reads  ┌──────────────────────────────────┐    │
-│   │orchagent │◄────────│           Redis                  │    │
-│   └────┬─────┘  APPL_DB│  APPL_DB(0) │ ASIC_DB(1) │ ...  │    │
-│        │               └─────────────┼────────────┘       │    │
-│        │ SAI calls             writes │                    │    │
-│        ▼                             ▼                     │    │
-│   ┌──────────┐                ┌───────────┐               │    │
-│   │   SAI    │                │  ASIC_DB  │               │    │
-│   │ (vendor) │                │ (Redis 1) │               │    │
-│   └────┬─────┘                └───────────┘               │    │
-└────────┼─────────────────────────────────────────────────────────┘
-         │ hardware programming
-         ▼
-┌──────────────────────────────────────────────────────────────────┐
-│              Cisco 8000 ASIC (Silicon One)                      │
-│                    Hardware FIB                                  │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-**Key containers and their roles:**
-
-| Container | Process     | Role                                                        |
-|-----------|-------------|-------------------------------------------------------------|
-| `bgp`     | bgpd        | BGP protocol daemon — manages sessions and BGP RIB         |
-| `bgp`     | zebra       | FRR core — RIB manager, nexthop resolution, Netlink writes  |
-| `bgp`     | fpmsyncd    | Reads kernel routes via Netlink, writes to APPL_DB         |
-| `swss`    | orchagent   | Reads APPL_DB, translates to SAI calls, writes to ASIC_DB  |
-| `syncd`   | syncd       | Reads ASIC_DB, calls vendor SAI library to program hardware |
-
-**Why the indirection through Redis?**
-
-SONiC uses Redis as a decoupled message bus between containers so that:
-- Each container can be restarted independently without losing state
-- Multiple consumers can subscribe to the same data (e.g., both orchagent and a monitoring agent can watch APPL_DB)
-- State is persisted across container restarts
-- The architecture is vendor-agnostic — only the SAI layer differs between hardware platforms
-
----
-
-### Understanding Each FRR Configuration Knob
-
-Every line of BGP configuration in this lab has a specific purpose. This section explains each one in depth.
-
-#### `bgp router-id 1.1.1.1`
-
-The BGP Router-ID is a 32-bit identifier (displayed as a dotted-quad) that uniquely identifies this BGP speaker within the network. It is carried in the BGP OPEN message.
-
-**Rules:**
-- Must be globally unique within the BGP domain (not just the AS)
-- If two iBGP speakers have the same router-ID, sessions fail with NOTIFICATION error code 1, subcode 3 (Bad BGP Identifier)
-- FRR will automatically select the highest loopback IP as the router-ID if not configured explicitly — but explicit configuration is a best practice
-
-**Why use the loopback IP?** Using the Loopback0 address (e.g., 1.1.1.1) as the router-ID is conventional because it is stable — it doesn't change if a physical interface goes down.
-
-#### `bgp log-neighbor-changes`
-
-Tells FRR to log a message to syslog whenever a BGP neighbor transitions state (Up, Down, Reset). Without this, session flaps may go undetected. Example log entry:
-
-```
-%BGP-5-ADJCHANGE: neighbor 10.1.1.1 Up
-%BGP-5-ADJCHANGE: neighbor 10.1.1.1 Down (BGP Notification received)
-```
-
-View these events:
-```
-cisco@leaf-01:~$ docker exec bgp cat /var/log/frr/bgpd.log | grep ADJCHANGE
-```
-
-#### `no bgp ebgp-requires-policy`
-
-**Default behavior (without this command):** FRR requires that every eBGP neighbor has both an inbound and an outbound route-map configured before it will exchange routes. If any policy is missing, no routes are exchanged. This is a security-hardening feature introduced in FRR 5.0+ to prevent accidental full routing table leaks.
-
-**With `no bgp ebgp-requires-policy`:** This check is disabled. Any routes that match the address-family activation (`activate`) will be exchanged without requiring explicit policy.
-
-In a production deployment, you would configure explicit import/export policies. In this lab, we disable the requirement for simplicity so we can focus on the BGP fundamentals.
-
-> **Security Note:** In production, always configure inbound policies to filter unexpected prefixes and outbound policies to control what you advertise. Without these, a misconfigured peer could inject arbitrary routes.
-
-#### `no bgp default ipv4-unicast`
-
-**Default behavior (without this command):** FRR automatically activates every neighbor in the IPv4 unicast address family. Any neighbor you define immediately starts exchanging IPv4 routes.
-
-**With `no bgp default ipv4-unicast`:** Neighbors are not activated in any address family by default. You must explicitly run `neighbor X activate` inside each `address-family` block.
-
-**Why this is preferred:** Explicit activation makes the configuration self-documenting and prevents accidentally running IPv4 on a neighbor you intended to configure for IPv6-only. It also matches modern data center BGP design practices.
-
-#### `bgp bestpath as-path multipath-relax`
-
-Standard RFC BGP ECMP requires that multiple paths to the same prefix have **identical AS_PATHs** to qualify as equal-cost multipath. In a dual-spine design, paths through spine-01 (AS 65000) and spine-02 (AS 65100) would have different AS_PATHs — so no ECMP.
-
-This knob relaxes the requirement: paths are ECMP-eligible if they have the same AS_PATH **length**, regardless of the actual AS numbers in the path.
-
-**Effect in this lab:** With one spine, this knob has no immediate effect — there is only one path per prefix. But it is included as a best practice for when the topology expands. Removing it in a dual-spine topology would silently break ECMP without any error message.
-
-#### `no bgp network import-check`
-
-**Default behavior:** When you use `network X.X.X.X/mask` to advertise a prefix into BGP, FRR checks that the exact prefix is present in the routing table before advertising it. If the prefix is not in the RIB (e.g., the loopback interface is down), the advertisement is suppressed.
-
-**With `no bgp network import-check`:** The RIB check is skipped. The prefix is advertised regardless of whether it exists in the routing table.
-
-In this lab, our loopback addresses are always present (loopback interfaces never go down), so this knob doesn't change behavior. However, it prevents a subtle issue: if SONiC's loopback address is briefly removed from the RIB during a configuration reload, BGP would otherwise withdraw and re-advertise the loopback prefix, causing unnecessary churn.
-
-#### `neighbor X remote-as Y`
-
-Defines a BGP neighbor relationship. FRR will:
-1. Attempt to open a TCP connection to IP address X on port 179
-2. Send a BGP OPEN with local AS number
-3. Verify that the peer's OPEN contains AS number Y (if not, send NOTIFICATION and drop)
-
-For eBGP, the neighbor IP must be directly reachable (a connected route). FRR enforces this by default for eBGP — if the peer IP is not reachable via a connected route, the session is rejected.
-
-> **eBGP Multihop:** If you need eBGP sessions across non-directly-connected links, you must configure `neighbor X ebgp-multihop N`. Not used in this lab.
-
-#### `address-family ipv4 unicast` / `address-family ipv6 unicast`
-
-BGP is a multi-protocol routing protocol. Each address family (IPv4 unicast, IPv6 unicast, VPNv4, EVPN, etc.) is managed independently within the same BGP session. This separation allows you to activate different families on different neighbors and apply independent policies.
-
-The address family block contains:
-- `network` — prefixes to originate into BGP
-- `neighbor X activate` — enable this address family for neighbor X
-- `neighbor X route-map NAME in/out` — apply policy
-- `maximum-paths N` — ECMP configuration
-
-Only neighbors that are explicitly `activate`d in an address family participate in that family's route exchange.
-
-#### `network 1.1.1.1/32`
-
-Originates the prefix `1.1.1.1/32` into the BGP RIB as a locally generated route. Key behaviors:
-- Sets ORIGIN = IGP (code `i`)
-- Sets AS_PATH = empty (the local AS will be prepended when advertised to eBGP peers)
-- Sets NEXT_HOP = 0.0.0.0 (FRR's way of indicating a local route — changed to the interface IP when advertised)
-- The prefix must exist in the RIB unless `no bgp network import-check` is set
-
-This is different from **redistribution**: `network` originates a specific prefix explicitly. Redistribution (`redistribute connected`) would inject all connected routes, which is less precise and can cause unintended prefix leaks.
-
-#### `maximum-paths 64`
-
-Allows FRR to install up to 64 equal-cost BGP paths in the FIB simultaneously. Without this, only one best path is installed. ECMP requires:
-1. Multiple paths to the same prefix pass the best-path algorithm with equal preference
-2. `maximum-paths N` allows N paths to be installed
-3. The ASIC performs per-flow (5-tuple hash) load balancing across all installed next-hops
-
-The Cisco 8000's Silicon One ASIC supports hardware ECMP hashing. The maximum value of 64 ensures we never artificially limit ECMP in the hardware.
-
-#### `route-map RM_SET_SRC permit 10`
-
-Route maps are ordered lists of `permit` or `deny` clauses, each with a sequence number. They are evaluated top-to-bottom; the first matching clause wins. An implicit `deny all` exists at the end of every route map.
-
-This particular route map:
-- Sequence 10 — the only clause
-- `permit` — if matched, apply the `set` actions and allow the route through
-- No `match` conditions — matches ALL routes (catch-all)
-- `set src 1.1.1.1` — sets the preferred source address for this route
-
-The route map is applied to the **protocol** (not a neighbor):
-```
-ip protocol bgp route-map RM_SET_SRC
-```
-
-This instructs the Linux kernel: for any BGP-installed route, use `1.1.1.1` as the source address when originating traffic toward that route's next-hop. This affects locally-sourced traffic (like ping), not transit traffic.
-
-**Why is this needed?** Without `RM_SET_SRC`, when leaf-01 pings `2.2.2.2`, Linux would source the packet from `10.1.1.0` (the outgoing interface IP). Leaf-02 would receive an ICMP request from `10.1.1.0`, but the reply would be sent to `10.1.1.0` which is only reachable via the spine — creating an asymmetric path that may not work. By sourcing from the loopback (`1.1.1.1`), the return path is also BGP-routed and fully symmetric.
-
-#### `route-map BGP-IPV6 permit 20` / `set ipv6 next-hop prefer-global`
-
-IPv6 interfaces have both a **link-local** address (fe80::/10, automatically generated from the MAC) and a **global** address (in our case, 2001:db8:1:1::x/127).
-
-By default, FRR may use the link-local address as the IPv6 NEXT_HOP in BGP UPDATEs. Link-local addresses are only valid on the local segment and cannot be routed — using them as next-hops for BGP-learned prefixes would create a broken routing table.
-
-`set ipv6 next-hop prefer-global` overrides this behavior and forces FRR to use the global IPv6 address as the NEXT_HOP in the BGP RIB. This is applied **inbound** on each IPv6 neighbor so that when we receive routes from a peer, the next-hop stored in our BGP RIB is the peer's global address (e.g., `2001:db8:1:1::1`), not its link-local address.
-
-#### `ip nht resolve-via-default` / `ipv6 nht resolve-via-default`
-
-**NHT = Next-Hop Tracking.** FRR's zebra monitors the reachability of BGP next-hops. When a next-hop becomes unreachable, zebra notifies bgpd via ZAPI (`ZEBRA_NEXTHOP_UPDATE`), and bgpd marks all routes through that next-hop as invalid.
-
-By default, NHT uses only specific (non-default) routes to validate next-hop reachability. `resolve-via-default` allows the default route (`0.0.0.0/0` or `::/0`) to be used for next-hop resolution. Without this, if the next-hop is only reachable via a default route, NHT would consider it invalid and suppress the BGP session.
-
-In this lab, since next-hops are directly connected (/31 links), this knob doesn't change behavior — but it is included as a best practice for topologies where next-hops might be reachable only via a default route.
-
----
-
-## SONiC Interface Configuration and Verification
-
-Before configuring BGP we need to confirm that all interfaces have the correct IP addresses assigned from Lab 1. BGP sessions are established using these point-to-point IP addresses as neighbors.
-
-### Interface IP Address Plan
-
-| Device   | Interface  | IPv4 Address   | IPv6 Address            |
-|----------|------------|----------------|-------------------------|
-| leaf-01  | Loopback0  | 1.1.1.1/32     | fc00:0:1::1/128         |
-| leaf-01  | Ethernet0  | 10.1.1.0/31    | 2001:db8:1:1::0/127     |
-| leaf-02  | Loopback0  | 2.2.2.2/32     | fc00:0:2::1/128         |
-| leaf-02  | Ethernet0  | 10.1.1.2/31    | 2001:db8:1:1::2/127     |
-| leaf-03  | Loopback0  | 3.3.3.3/32     | fc00:0:3::1/128         |
-| leaf-03  | Ethernet0  | 10.1.1.4/31    | 2001:db8:1:1::4/127     |
-| spine-01 | Loopback0  | 4.4.4.4/32     | fc00:0:4::1/128         |
-| spine-01 | Ethernet0  | 10.1.1.1/31    | 2001:db8:1:1::1/127     |
-| spine-01 | Ethernet8  | 10.1.1.3/31    | 2001:db8:1:1::3/127     |
-| spine-01 | Ethernet16 | 10.1.1.5/31    | 2001:db8:1:1::5/127     |
-
-### Verify Interface Status
-
-On **leaf-01**, confirm all fabric-facing interfaces are operationally up:
-
-```
-cisco@leaf-01:~$ show interface status
-```
-
-Expected output (relevant interfaces shown):
-```
-  Interface            Lanes    Speed    MTU    FEC      Alias    Vlan    Oper    Admin    Type    Asym PFC
------------  ---------------  -------  -----  -----  -------  ------  ------  -------  ------  ----------
-  Ethernet0  2304,2305,...    400G     9100   none     etp0    routed    up       up    QSFP-DD      N/A
-  Ethernet8  2320,2321,...    400G     9100   none     etp1    routed    up       up    QSFP-DD      N/A
-```
-
-### Verify IP Addresses
-
-Confirm the IPv4 and IPv6 addresses are correctly assigned:
-
-```
-cisco@leaf-01:~$ show ip interfaces
-```
-
-Expected output:
-```
-Interface       Master    IPv4 address/mask    Admin/Oper    BGP Neighbor    Neighbor IP
------------  --------  -------------------  ------------  --------------  -------------
-Ethernet0                  10.1.1.0/31           up/up         N/A             N/A
-Loopback0                  1.1.1.1/32            up/up         N/A             N/A
-docker0                    240.127.1.1/24        up/up         N/A             N/A
-eth0                       172.20.2.100/24       up/up         N/A             N/A
-lo                         127.0.0.1/8           up/up         N/A             N/A
-```
-
-Check IPv6 addresses:
-
-```
-cisco@leaf-01:~$ show ipv6 interfaces
-```
-
-Expected output:
-```
-Interface       Master    IPv6 address/mask                    Admin/Oper    BGP Neighbor    Neighbor IP
------------  --------  -----------------------------------  ------------  --------------  -------------
-Ethernet0              2001:db8:1:1::0/127                      up/up        N/A              N/A
-Loopback0              fc00:0:1::1/128                          up/up        N/A              N/A
-```
-
-### Verify Point-to-Point Connectivity
-
-Before proceeding with BGP, verify Layer 3 reachability to the spine across each link:
-
-```
-cisco@leaf-01:~$ ping 10.1.1.1 -c 3
-```
-
-Expected output:
-```
-PING 10.1.1.1 (10.1.1.1) 56(84) bytes of data.
-64 bytes from 10.1.1.1: icmp_seq=1 ttl=64 time=1.24 ms
-64 bytes from 10.1.1.1: icmp_seq=2 ttl=64 time=0.98 ms
-64 bytes from 10.1.1.1: icmp_seq=3 ttl=64 time=1.01 ms
-
---- 10.1.1.1 ping statistics ---
-3 packets transmitted, 3 received, 0% packet loss, time 2003ms
-rtt min/avg/max/mdev = 0.980/1.076/1.240/0.118 ms
-```
-
-Verify IPv6 reachability:
-
-```
-cisco@leaf-01:~$ ping6 2001:db8:1:1::1 -c 3
-```
-
-> **Troubleshooting:** If ping fails, go back and verify the interface configuration in `config_db.json` and confirm `Ethernet0` has `admin_status: up` and the correct IP addresses assigned.
-
-
-## Build a Leaf-Spine BGP Fabric
-
-### BGP Design Principles
-
-This lab implements a standard two-tier IP fabric using eBGP (External BGP). Key design decisions:
-
-**Why eBGP for a fabric?**
-eBGP is widely used in modern data center fabrics (as defined in RFC 7938) because:
-- Simple, loop-free routing with AS-PATH as the loop prevention mechanism
-- No IGP needed — BGP carries all fabric routes
-- Scales well as the fabric grows
-- Fine-grained traffic engineering per prefix
-
-**AS Number Assignment:**
-
-| Device   | ASN   | Role  |
-|----------|-------|-------|
-| spine-01 | 65000 | Spine |
-| leaf-01  | 65001 | Leaf  |
-| leaf-02  | 65002 | Leaf  |
-| leaf-03  | 65003 | Leaf  |
-
-Each leaf uses a **unique private ASN**. This is important: if all leaves shared the same ASN, the spine would see the AS-PATH loop and reject routes propagated between leaves.
-
-**What gets advertised:**
-- Each node advertises its Loopback0 prefix into BGP
-- Loopback addresses serve as stable, router-ID anchors and are used for management, services, and as BGP next-hops in advanced designs
-
-**BGP Feature Flags Used:**
-
-| FRR Knob                          | Purpose                                                       |
-|-----------------------------------|---------------------------------------------------------------|
-| `no bgp ebgp-requires-policy`     | Disables mandatory import/export policy check (lab simplification) |
-| `no bgp default ipv4-unicast`     | Requires explicit per-neighbor address-family activation      |
-| `bgp bestpath as-path multipath-relax` | Allows ECMP across neighbors with different AS-PATHs     |
-| `no bgp network import-check`     | Allows advertising prefixes not present in RIB               |
-| `maximum-paths 64`                | Enable up to 64 ECMP paths per prefix                        |
-
-
-### Route Maps Explained
-
-Three route maps are used in this lab:
-
-**`RM_SET_SRC`** — Sets the source address for BGP-learned IPv4 routes in the kernel. Without this, Linux would source traffic from whatever interface is chosen by the kernel, which can cause asymmetric routing.
-
-**`RM_SET_SRC6`** — Same function for IPv6 BGP-learned routes.
-
-**`BGP-IPV6`** — Applied inbound on IPv6 neighbors. Sets the next-hop to prefer the global IPv6 address over the link-local address. This ensures correct forwarding behavior for IPv6 routes learned over link-local sessions.
-
-
-## BGP Configuration using SONiC and FRR
-
-### Configuration Methods
-
-There are two ways to configure FRR on SONiC in `split` mode:
-
-**Method 1 — Interactive via `vtysh`** (used in this lab)
-Configure BGP directly in the FRR shell. Changes take effect immediately. You must save with `copy running-config startup-config` to persist across reboots.
-
-**Method 2 — Edit `bgpd.conf` directly**
-Edit `/etc/sonic/frr/bgpd.conf` and restart the BGP container:
-```
+cat > /tmp/routing_mode.json << 'EOF'
+{
+    "DEVICE_METADATA": {
+        "localhost": {
+            "docker_routing_config_mode": "split-unified"
+        }
+    }
+}
+EOF
+
+sudo config load /tmp/routing_mode.json -y
+sudo config save -y
 sudo systemctl restart bgp
 ```
 
-In this lab we use **Method 1** to build familiarity with the FRR CLI.
+Verify:
 
-### Configuration Modes in vtysh
-
-vtysh uses a hierarchical configuration mode system. Understanding which mode you are in is essential:
-
-```
-leaf-01#                          ← EXEC mode (show commands only)
-leaf-01# configure terminal
-leaf-01(config)#                  ← Global CONFIG mode
-leaf-01(config)# router bgp 65001
-leaf-01(config-router)#           ← BGP ROUTER mode
-leaf-01(config-router)# address-family ipv4 unicast
-leaf-01(config-router-af)#        ← ADDRESS FAMILY mode
-leaf-01(config-router-af)# exit-address-family
-leaf-01(config-router)#           ← Back to BGP ROUTER mode
-leaf-01(config-router)# exit
-leaf-01(config)#                  ← Back to Global CONFIG mode
-leaf-01(config)# end              ← Return to EXEC mode (shortcut from any depth)
-leaf-01#
+```bash
+show runningconfiguration all | grep docker_routing_config_mode
 ```
 
-You can run `show` commands from EXEC mode at any time without exiting configuration mode by prefixing with `do`:
+Expected: `"docker_routing_config_mode": "split-unified"`
+
+---
+
+## Step 2 — Interface IPs
+
+**Leaf1:**
+
+```bash
+sudo config interface ip add Ethernet0 1.4.1.1/24
+sudo config interface ip add Loopback0 1.1.1.1/32
+sudo config save -y
 ```
-leaf-01(config-router)# do show bgp summary
+
+**Leaf2:**
+
+```bash
+sudo config interface ip add Ethernet0 2.4.1.2/24
+sudo config interface ip add Loopback0 2.2.2.2/32
+sudo config save -y
+```
+
+**Leaf3:**
+
+```bash
+sudo config interface ip add Ethernet0 3.4.1.3/24
+sudo config interface ip add Loopback0 3.3.3.3/32
+sudo config save -y
+```
+
+**Spine4:**
+
+```bash
+sudo config interface ip add Ethernet0 1.4.1.4/24
+sudo config interface ip add Ethernet4 2.4.1.4/24
+sudo config interface ip add Ethernet8 3.4.1.4/24
+sudo config interface ip add Loopback0 4.4.4.4/32
+sudo config save -y
+```
+
+### Verification — show ip interfaces
+
+```bash
+show ip interfaces
+```
+
+**Leaf1** output:
+```
+Interface    Master    IPv4 address/mask    Admin/Oper    BGP Neighbor    Neighbor IP
+-----------  --------  -------------------  ------------  --------------  -------------
+Ethernet0              1.4.1.1/24           up/up         N/A             N/A
+Loopback0              1.1.1.1/32           up/up         N/A             N/A
+docker0                240.127.1.1/24       up/down       N/A             N/A
+eth0                   192.168.122.66/24    up/up         N/A             N/A
+lo                     127.0.0.1/16         up/up         N/A             N/A
+```
+
+All lab interfaces must show `up/up` before proceeding.
+
+---
+
+## Step 3 — Underlay BGP Configuration
+
+> **FRR defaults to be aware of:**
+> - **`bgp ebgp-requires-policy`** is enabled by default in FRR. Every eBGP neighbor must have an explicit inbound and outbound route-map applied, or no routes will be exchanged. This is why `route-map PASS` is applied to all neighbors.
+> - **`no bgp default ipv4-unicast`** is set explicitly here. By default in FRR, all neighbors are automatically activated in the IPv4 unicast address-family. Disabling this ensures neighbors are only activated where explicitly configured.
+
+> Enter `vtysh` on each device before pasting.
+
+**Leaf1:**
+
+```
+ip prefix-list LOOPBACKS seq 5 permit 1.1.1.1/32
+
+route-map PASS permit 10
+exit
+
+route-map ADVERTISE permit 10
+ match ip address prefix-list LOOPBACKS
+exit
+
+router bgp 1
+ bgp router-id 1.1.1.1
+ no bgp default ipv4-unicast
+ neighbor SPINE peer-group
+ neighbor SPINE remote-as 4
+ neighbor 1.4.1.4 peer-group SPINE
+ !
+ address-family ipv4 unicast
+  redistribute connected
+  neighbor SPINE activate
+  neighbor SPINE route-map PASS in
+  neighbor SPINE route-map ADVERTISE out
+ exit-address-family
+exit
+```
+
+**Leaf2:**
+
+```
+ip prefix-list LOOPBACKS seq 5 permit 2.2.2.2/32
+
+route-map PASS permit 10
+exit
+
+route-map ADVERTISE permit 10
+ match ip address prefix-list LOOPBACKS
+exit
+
+router bgp 2
+ bgp router-id 2.2.2.2
+ no bgp default ipv4-unicast
+ neighbor SPINE peer-group
+ neighbor SPINE remote-as 4
+ neighbor 2.4.1.4 peer-group SPINE
+ !
+ address-family ipv4 unicast
+  redistribute connected
+  neighbor SPINE activate
+  neighbor SPINE route-map PASS in
+  neighbor SPINE route-map ADVERTISE out
+ exit-address-family
+exit
+```
+
+**Leaf3:**
+
+```
+ip prefix-list LOOPBACKS seq 5 permit 3.3.3.3/32
+
+route-map PASS permit 10
+exit
+
+route-map ADVERTISE permit 10
+ match ip address prefix-list LOOPBACKS
+exit
+
+router bgp 3
+ bgp router-id 3.3.3.3
+ no bgp default ipv4-unicast
+ neighbor SPINE peer-group
+ neighbor SPINE remote-as 4
+ neighbor 3.4.1.4 peer-group SPINE
+ !
+ address-family ipv4 unicast
+  redistribute connected
+  neighbor SPINE activate
+  neighbor SPINE route-map PASS in
+  neighbor SPINE route-map ADVERTISE out
+ exit-address-family
+exit
+```
+
+**Spine4:**
+
+```
+route-map PASS permit 10
+exit
+
+router bgp 4
+ bgp router-id 4.4.4.4
+ no bgp default ipv4-unicast
+ neighbor LEAF peer-group
+ neighbor 1.4.1.1 remote-as 1
+ neighbor 1.4.1.1 peer-group LEAF
+ neighbor 2.4.1.2 remote-as 2
+ neighbor 2.4.1.2 peer-group LEAF
+ neighbor 3.4.1.3 remote-as 3
+ neighbor 3.4.1.3 peer-group LEAF
+ !
+ address-family ipv4 unicast
+  redistribute connected
+  neighbor LEAF activate
+  neighbor LEAF route-map PASS in
+  neighbor LEAF route-map PASS out
+ exit-address-family
+exit
 ```
 
 ---
 
-### Task 1: Configure BGP on spine-01
+## Step 4 — Extensive Verification
 
-spine-01 peers with all three leaves. It is the hub of our eBGP fabric — every inter-leaf route transits through it.
+### 4.1 FRR Running Configuration
 
-SSH to spine-01:
-```
-ssh cisco@172.20.2.103
-```
+Confirms the full FRR config is applied as expected. Check router-id, AS number, peer-group membership, route-maps, and prefix-lists.
 
-Enter the FRR shell:
-```
-cisco@spine-01:~$ sudo vtysh
+```bash
+vtysh -c 'show running-config'
 ```
 
-Enter global configuration mode:
+**Leaf1** output:
 ```
-spine-01# configure terminal
-```
-
-Create the BGP process and set the router-id:
-```
-spine-01(config)# router bgp 65000
-spine-01(config-router)# bgp router-id 4.4.4.4
-spine-01(config-router)# bgp log-neighbor-changes
-spine-01(config-router)# no bgp ebgp-requires-policy
-spine-01(config-router)# no bgp default ipv4-unicast
-spine-01(config-router)# bgp bestpath as-path multipath-relax
-spine-01(config-router)# no bgp network import-check
-```
-
-Define the three leaf neighbors (IPv4):
-```
-spine-01(config-router)# neighbor 10.1.1.0 remote-as 65001
-spine-01(config-router)# neighbor 10.1.1.2 remote-as 65002
-spine-01(config-router)# neighbor 10.1.1.4 remote-as 65003
-```
-
-Define the three leaf neighbors (IPv6):
-```
-spine-01(config-router)# neighbor 2001:db8:1:1::0 remote-as 65001
-spine-01(config-router)# neighbor 2001:db8:1:1::2 remote-as 65002
-spine-01(config-router)# neighbor 2001:db8:1:1::4 remote-as 65003
-```
-
-Configure the IPv4 unicast address family:
-```
-spine-01(config-router)# address-family ipv4 unicast
-spine-01(config-router-af)# network 4.4.4.4/32
-spine-01(config-router-af)# neighbor 10.1.1.0 activate
-spine-01(config-router-af)# neighbor 10.1.1.2 activate
-spine-01(config-router-af)# neighbor 10.1.1.4 activate
-spine-01(config-router-af)# maximum-paths 64
-spine-01(config-router-af)# exit-address-family
-```
-
-Configure the IPv6 unicast address family:
-```
-spine-01(config-router)# address-family ipv6 unicast
-spine-01(config-router-af)# network fc00:0:4::1/128
-spine-01(config-router-af)# neighbor 2001:db8:1:1::0 activate
-spine-01(config-router-af)# neighbor 2001:db8:1:1::0 route-map BGP-IPV6 in
-spine-01(config-router-af)# neighbor 2001:db8:1:1::2 activate
-spine-01(config-router-af)# neighbor 2001:db8:1:1::2 route-map BGP-IPV6 in
-spine-01(config-router-af)# neighbor 2001:db8:1:1::4 activate
-spine-01(config-router-af)# neighbor 2001:db8:1:1::4 route-map BGP-IPV6 in
-spine-01(config-router-af)# maximum-paths 64
-spine-01(config-router-af)# exit-address-family
-spine-01(config-router)# exit
-```
-
-Configure the route maps:
-```
-spine-01(config)# route-map RM_SET_SRC permit 10
-spine-01(config-route-map)# set src 4.4.4.4
-spine-01(config-route-map)# exit
-
-spine-01(config)# route-map RM_SET_SRC6 permit 10
-spine-01(config-route-map)# set src fc00:0:4::1
-spine-01(config-route-map)# exit
-
-spine-01(config)# route-map BGP-IPV6 permit 20
-spine-01(config-route-map)# set ipv6 next-hop prefer-global
-spine-01(config-route-map)# exit
-```
-
-Bind protocol route maps (installs correct source address in kernel for BGP routes):
-```
-spine-01(config)# ip protocol bgp route-map RM_SET_SRC
-spine-01(config)# ipv6 protocol bgp route-map RM_SET_SRC6
-spine-01(config)# ip nht resolve-via-default
-spine-01(config)# ipv6 nht resolve-via-default
-spine-01(config)# end
-```
-
-Save the configuration to disk:
-```
-spine-01# copy running-config startup-config
-```
-
-This writes the running FRR configuration to `/etc/sonic/frr/bgpd.conf`.
-
-Verify the saved file:
-```
-spine-01# exit
-cisco@spine-01:~$ sudo cat /etc/sonic/frr/bgpd.conf
+frr version 8.5.4
+frr defaults traditional
+hostname pod12-leaf1
+no zebra nexthop kernel enable
+fpm address 127.0.0.1
+no fpm use-next-hop-groups
+service integrated-vtysh-config
+!
+router bgp 1
+ bgp router-id 1.1.1.1
+ no bgp default ipv4-unicast
+ neighbor SPINE peer-group
+ neighbor SPINE remote-as 4
+ neighbor 1.4.1.4 peer-group SPINE
+ !
+ address-family ipv4 unicast
+  redistribute connected
+  neighbor SPINE activate
+  neighbor SPINE route-map PASS in
+  neighbor SPINE route-map ADVERTISE out
+ exit-address-family
+exit
+!
+ip prefix-list LOOPBACKS seq 5 permit 1.1.1.1/32
+!
+route-map RM_SET_SRC permit 10
+ set src 1.1.1.1
+exit
+!
+route-map PASS permit 10
+exit
+!
+route-map ADVERTISE permit 10
+ match ip address prefix-list LOOPBACKS
+exit
+!
+ip protocol bgp route-map RM_SET_SRC
 ```
 
 ---
 
-### Task 2: Configure BGP on leaf-01
+### 4.2 BGP Neighbor Summary
 
-SSH to leaf-01:
-```
-ssh cisco@172.20.2.100
-```
+All neighbors must show a numeric `PfxRcd` value (not `Active`, `Idle`, or `Connect`).
 
-Enter vtysh:
-```
-cisco@leaf-01:~$ sudo vtysh
+Run the following on **both Leaf1 and Spine4**:
+
+```bash
+vtysh -c 'show bgp ipv4 unicast summary'
 ```
 
-Configure BGP — leaf-01 has a single neighbor (spine-01) in each address family:
+**Leaf1** output:
 ```
-leaf-01# configure terminal
-
-leaf-01(config)# router bgp 65001
-leaf-01(config-router)# bgp router-id 1.1.1.1
-leaf-01(config-router)# bgp log-neighbor-changes
-leaf-01(config-router)# no bgp ebgp-requires-policy
-leaf-01(config-router)# no bgp default ipv4-unicast
-leaf-01(config-router)# bgp bestpath as-path multipath-relax
-leaf-01(config-router)# no bgp network import-check
-
-leaf-01(config-router)# neighbor 10.1.1.1 remote-as 65000
-leaf-01(config-router)# neighbor 2001:db8:1:1::1 remote-as 65000
-
-leaf-01(config-router)# address-family ipv4 unicast
-leaf-01(config-router-af)# network 1.1.1.1/32
-leaf-01(config-router-af)# neighbor 10.1.1.1 activate
-leaf-01(config-router-af)# maximum-paths 64
-leaf-01(config-router-af)# exit-address-family
-
-leaf-01(config-router)# address-family ipv6 unicast
-leaf-01(config-router-af)# network fc00:0:1::1/128
-leaf-01(config-router-af)# neighbor 2001:db8:1:1::1 activate
-leaf-01(config-router-af)# neighbor 2001:db8:1:1::1 route-map BGP-IPV6 in
-leaf-01(config-router-af)# maximum-paths 64
-leaf-01(config-router-af)# exit-address-family
-leaf-01(config-router)# exit
-
-leaf-01(config)# route-map RM_SET_SRC permit 10
-leaf-01(config-route-map)# set src 1.1.1.1
-leaf-01(config-route-map)# exit
-
-leaf-01(config)# route-map RM_SET_SRC6 permit 10
-leaf-01(config-route-map)# set src fc00:0:1::1
-leaf-01(config-route-map)# exit
-
-leaf-01(config)# route-map BGP-IPV6 permit 20
-leaf-01(config-route-map)# set ipv6 next-hop prefer-global
-leaf-01(config-route-map)# exit
-
-leaf-01(config)# ip protocol bgp route-map RM_SET_SRC
-leaf-01(config)# ipv6 protocol bgp route-map RM_SET_SRC6
-leaf-01(config)# ip nht resolve-via-default
-leaf-01(config)# ipv6 nht resolve-via-default
-leaf-01(config)# end
-
-leaf-01# copy running-config startup-config
-```
-
----
-
-### Task 3: Configure BGP on leaf-02
-
-SSH to leaf-02:
-```
-ssh cisco@172.20.2.101
-```
-
-Enter vtysh and configure BGP. leaf-02 is AS 65002, loopback 2.2.2.2, neighbor is the spine-01 Ethernet8 address:
-
-```
-cisco@leaf-02:~$ sudo vtysh
-
-leaf-02# configure terminal
-
-leaf-02(config)# router bgp 65002
-leaf-02(config-router)# bgp router-id 2.2.2.2
-leaf-02(config-router)# bgp log-neighbor-changes
-leaf-02(config-router)# no bgp ebgp-requires-policy
-leaf-02(config-router)# no bgp default ipv4-unicast
-leaf-02(config-router)# bgp bestpath as-path multipath-relax
-leaf-02(config-router)# no bgp network import-check
-
-leaf-02(config-router)# neighbor 10.1.1.3 remote-as 65000
-leaf-02(config-router)# neighbor 2001:db8:1:1::3 remote-as 65000
-
-leaf-02(config-router)# address-family ipv4 unicast
-leaf-02(config-router-af)# network 2.2.2.2/32
-leaf-02(config-router-af)# neighbor 10.1.1.3 activate
-leaf-02(config-router-af)# maximum-paths 64
-leaf-02(config-router-af)# exit-address-family
-
-leaf-02(config-router)# address-family ipv6 unicast
-leaf-02(config-router-af)# network fc00:0:2::1/128
-leaf-02(config-router-af)# neighbor 2001:db8:1:1::3 activate
-leaf-02(config-router-af)# neighbor 2001:db8:1:1::3 route-map BGP-IPV6 in
-leaf-02(config-router-af)# maximum-paths 64
-leaf-02(config-router-af)# exit-address-family
-leaf-02(config-router)# exit
-
-leaf-02(config)# route-map RM_SET_SRC permit 10
-leaf-02(config-route-map)# set src 2.2.2.2
-leaf-02(config-route-map)# exit
-
-leaf-02(config)# route-map RM_SET_SRC6 permit 10
-leaf-02(config-route-map)# set src fc00:0:2::1
-leaf-02(config-route-map)# exit
-
-leaf-02(config)# route-map BGP-IPV6 permit 20
-leaf-02(config-route-map)# set ipv6 next-hop prefer-global
-leaf-02(config-route-map)# exit
-
-leaf-02(config)# ip protocol bgp route-map RM_SET_SRC
-leaf-02(config)# ipv6 protocol bgp route-map RM_SET_SRC6
-leaf-02(config)# ip nht resolve-via-default
-leaf-02(config)# ipv6 nht resolve-via-default
-leaf-02(config)# end
-
-leaf-02# copy running-config startup-config
-```
-
----
-
-### Task 4: Exercise — Configure BGP on leaf-03
-
-Using the pattern established in Tasks 2 and 3, configure BGP on **leaf-03** independently.
-
-**leaf-03 parameters:**
-
-| Parameter          | Value                 |
-|--------------------|-----------------------|
-| ASN                | 65003                 |
-| BGP Router-ID      | 3.3.3.3               |
-| IPv4 Loopback      | 3.3.3.3/32            |
-| IPv6 Loopback      | fc00:0:3::1/128       |
-| IPv4 Neighbor (spine-01 Ethernet16) | 10.1.1.5  |
-| IPv6 Neighbor (spine-01 Ethernet16) | 2001:db8:1:1::5 |
-| Spine ASN          | 65000                 |
-
-SSH to leaf-03:
-```
-ssh cisco@172.20.2.102
-```
-
-Configure BGP following the same steps as leaf-01 and leaf-02. When complete, save your configuration with `copy running-config startup-config`.
-
-> **Verification check:** After configuring leaf-03, confirm the BGP session comes up by running `show bgp summary` on both leaf-03 and spine-01. You should see `Established` state and prefix counts greater than zero.
-
-<details>
-<summary>Solution (click to expand)</summary>
-
-```
-cisco@leaf-03:~$ sudo vtysh
-
-leaf-03# configure terminal
-
-leaf-03(config)# router bgp 65003
-leaf-03(config-router)# bgp router-id 3.3.3.3
-leaf-03(config-router)# bgp log-neighbor-changes
-leaf-03(config-router)# no bgp ebgp-requires-policy
-leaf-03(config-router)# no bgp default ipv4-unicast
-leaf-03(config-router)# bgp bestpath as-path multipath-relax
-leaf-03(config-router)# no bgp network import-check
-
-leaf-03(config-router)# neighbor 10.1.1.5 remote-as 65000
-leaf-03(config-router)# neighbor 2001:db8:1:1::5 remote-as 65000
-
-leaf-03(config-router)# address-family ipv4 unicast
-leaf-03(config-router-af)# network 3.3.3.3/32
-leaf-03(config-router-af)# neighbor 10.1.1.5 activate
-leaf-03(config-router-af)# maximum-paths 64
-leaf-03(config-router-af)# exit-address-family
-
-leaf-03(config-router)# address-family ipv6 unicast
-leaf-03(config-router-af)# network fc00:0:3::1/128
-leaf-03(config-router-af)# neighbor 2001:db8:1:1::5 activate
-leaf-03(config-router-af)# neighbor 2001:db8:1:1::5 route-map BGP-IPV6 in
-leaf-03(config-router-af)# maximum-paths 64
-leaf-03(config-router-af)# exit-address-family
-leaf-03(config-router)# exit
-
-leaf-03(config)# route-map RM_SET_SRC permit 10
-leaf-03(config-route-map)# set src 3.3.3.3
-leaf-03(config-route-map)# exit
-
-leaf-03(config)# route-map RM_SET_SRC6 permit 10
-leaf-03(config-route-map)# set src fc00:0:3::1
-leaf-03(config-route-map)# exit
-
-leaf-03(config)# route-map BGP-IPV6 permit 20
-leaf-03(config-route-map)# set ipv6 next-hop prefer-global
-leaf-03(config-route-map)# exit
-
-leaf-03(config)# ip protocol bgp route-map RM_SET_SRC
-leaf-03(config)# ipv6 protocol bgp route-map RM_SET_SRC6
-leaf-03(config)# ip nht resolve-via-default
-leaf-03(config)# ipv6 nht resolve-via-default
-leaf-03(config)# end
-
-leaf-03# copy running-config startup-config
-```
-
-</details>
-
----
-
-### Verify Saved FRR Configuration
-
-On any node, confirm the FRR configuration was saved correctly to disk:
-
-```
-cisco@leaf-01:~$ show startupconfiguration bgp
-```
-
-Or directly view the file:
-```
-cisco@leaf-01:~$ sudo cat /etc/sonic/frr/bgpd.conf
-```
-
-You can also view the running FRR configuration from SONiC CLI:
-```
-cisco@leaf-01:~$ show run bgp
-```
-
-
-## BGP Verification
-
-### BGP Summary
-
-The `show bgp summary` command gives a quick overview of all BGP neighbors and their state. Run this on **leaf-01**:
-
-```
-cisco@leaf-01:~$ show bgp summary
-```
-
-Expected output:
-```
-IPv4 Unicast Summary (VRF default):
-BGP router identifier 1.1.1.1, local AS number 65001 vrf-id 0
-BGP table version 4
-RIB entries 7, using 1288 bytes of memory
-Peers 1, using 724 KiB of memory
+BGP router identifier 1.1.1.1, local AS number 1 vrf-id 0
+BGP table version 21
+RIB entries 17, using 3808 bytes of memory
+Peers 1, using 22 KiB of memory
+Peer groups 1, using 64 bytes of memory
 
 Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
-10.1.1.1        4      65000       135       132        0    0    0 00:02:18            3        1 N/A
-
-Total number of neighbors 1
-
-IPv6 Unicast Summary (VRF default):
-BGP router identifier 1.1.1.1, local AS number 65001 vrf-id 0
-BGP table version 4
-RIB entries 7, using 1288 bytes of memory
-Peers 1, using 724 KiB of memory
-
-Neighbor              V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
-2001:db8:1:1::1       4      65000       135       132        0    0    0 00:02:18            3        1 N/A
+1.4.1.4         4          4        25        12        0    0    0 00:00:31            8        1 N/A
 
 Total number of neighbors 1
 ```
 
-Key fields to observe:
-- **State/PfxRcd**: Should show a number (not `Idle`, `Active`, or `Connect`) — this is how many prefixes were received from the neighbor
-- **PfxSnt**: Prefixes sent to the neighbor
-- **Up/Down**: Session uptime — confirms the session is established
+- `PfxRcd 8` — 8 prefixes received from Spine4 (loopbacks + connected subnets from all devices).
+- `PfxSnt 1` — only the local loopback (`1.1.1.1/32`), filtered by the `ADVERTISE` route-map.
 
-Now run the same command on **spine-01** to see all three leaf neighbors:
-
+**Spine4** output:
 ```
-cisco@spine-01:~$ show bgp summary
-```
-
-Expected output shows three neighbors each receiving 1 prefix (their respective loopback) and sending 4 prefixes (spine loopback + 3 leaf loopbacks):
-```
-IPv4 Unicast Summary (VRF default):
-BGP router identifier 4.4.4.4, local AS number 65000 vrf-id 0
-BGP table version 7
-RIB entries 7, using 1288 bytes of memory
-Peers 3, using 2171 KiB of memory
+BGP router identifier 4.4.4.4, local AS number 4 vrf-id 0
+BGP table version 11
+RIB entries 17, using 3808 bytes of memory
+Peers 3, using 66 KiB of memory
+Peer groups 1, using 64 bytes of memory
 
 Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
-10.1.1.0        4      65001       218       215        0    0    0 00:05:31            1        4 N/A
-10.1.1.2        4      65002       201       198        0    0    0 00:04:47            1        4 N/A
-10.1.1.4        4      65003       187       185        0    0    0 00:04:12            1        4 N/A
+1.4.1.1         4          1        14        27        0    0    0 00:00:38            1        9 N/A
+2.4.1.2         4          2        14        38        0    0    0 00:07:01            1        9 N/A
+3.4.1.3         4          3        17        48        0    0    0 00:07:01            1        9 N/A
 
 Total number of neighbors 3
 ```
 
-### BGP Neighbor Detail
+- All three leaf sessions are `Established` with `PfxRcd 1` — each leaf advertises only its loopback.
+- `PfxSnt 9` — Spine4 sends all connected subnets plus every loopback it has learned from the other leaves.
 
-For detailed session information including capabilities, timers, and message counters:
+---
 
-```
-cisco@leaf-01:~$ show bgp neighbors 10.1.1.1
-```
+### 4.3 BGP Route Table
 
-Key sections to review in the output:
+`*>` marks the best path. Remote loopbacks should show AS paths through the spine.
 
-```
-BGP neighbor is 10.1.1.1, remote AS 65000, local AS 65001, external link
-  BGP version 4, remote router ID 4.4.4.4
-  BGP state = Established, up for 00:05:31
-  Last read 00:00:30, Last write 00:00:30
-  Hold time is 9, keepalive interval is 3 seconds
-  ...
-  Neighbor capabilities:
-    4 Byte AS: advertised and received
-    Extended Message: advertised and received
-    AddPath:
-      IPv4 Unicast: RX advertised, TX advertised and received
-    Route refresh: advertised and received(old & new)
-    Address Family IPv4 Unicast: advertised and received
-    Address Family IPv6 Unicast: advertised and received
-  ...
-  Message statistics:
-    Inq depth is 0
-    Outq depth is 0
-                         Sent       Rcvd
-    Opens:                  1          1
-    Notifications:          0          0
-    Updates:                4          3
-    Keepalives:           218        215
-    Route Refresh:          0          0
-    Capability:             0          0
-    Total:                223        219
-  ...
-  Local host: 10.1.1.0, Local port: 51234
-  Foreign host: 10.1.1.1, Foreign port: 179
+```bash
+vtysh -c 'show bgp ipv4 unicast'
 ```
 
-Observe:
-- **BGP state = Established** — session is up
-- **4 Byte AS** capability is negotiated
-- **Address Family IPv4 Unicast** and **IPv6 Unicast** are both advertised and received
-- TCP session uses port 179 (BGP standard)
-
-### BGP IPv4 Routing Table
-
-View the BGP RIB (Routing Information Base) for IPv4:
-
+**Leaf1** output:
 ```
-cisco@leaf-01:~$ show bgp ipv4 unicast
-```
-
-Expected output:
-```
-BGP table version is 4, local router ID is 1.1.1.1, vrf id 0
-Default local pref 100, local AS 65001
+BGP table version is 21, local router ID is 1.1.1.1, vrf id 0
+Default local pref 100, local AS 1
 Status codes:  s suppressed, d damped, h history, * valid, > best, = multipath,
                i internal, r RIB-failure, S Stale, R Removed
 Nexthop codes: @NNN nexthop's vrf id, < announce-nh-self
 Origin codes:  i - IGP, e - EGP, ? - incomplete
-RPKI validation codes: V valid, N invalid, U unknown
+RPKI validation codes: V valid, I invalid, N Not found
 
-   Network          Next Hop            Metric LocPrf Weight Path
-*> 1.1.1.1/32       0.0.0.0                  0         32768 i
-*> 2.2.2.2/32       10.1.1.1                 0             0 65000 65002 i
-*> 3.3.3.3/32       10.1.1.1                 0             0 65000 65003 i
-*> 4.4.4.4/32       10.1.1.1                 0             0 65000 i
+    Network          Next Hop            Metric LocPrf Weight Path
+ *> 1.1.1.1/32       0.0.0.0                  0         32768 ?
+ *  1.4.1.0/24       1.4.1.4                  0             0 4 ?
+ *>                  0.0.0.0                  0         32768 ?
+ *> 2.2.2.2/32       1.4.1.4                                0 4 2 ?
+ *> 2.4.1.0/24       1.4.1.4                  0             0 4 ?
+ *> 3.3.3.3/32       1.4.1.4                                0 4 3 ?
+ *> 3.4.1.0/24       1.4.1.4                  0             0 4 ?
+ *> 4.4.4.4/32       1.4.1.4                  0             0 4 ?
+ *  192.168.122.0/24 1.4.1.4                  0             0 4 ?
+ *>                  0.0.0.0                  0         32768 ?
+ *  192.168.123.0/24 1.4.1.4                  0             0 4 ?
+ *>                  0.0.0.0                  0         32768 ?
 
-Displayed  4 routes and 4 total paths
+Displayed  9 routes and 12 total paths
 ```
 
-Observe:
-- `1.1.1.1/32` — locally originated (weight 32768, next-hop 0.0.0.0)
-- `2.2.2.2/32` — learned via spine-01 (10.1.1.1), AS-PATH shows `65000 65002`
-- `3.3.3.3/32` — learned via spine-01, AS-PATH shows `65000 65003`
-- `4.4.4.4/32` — the spine's own loopback, AS-PATH shows `65000`
+- Remote loopbacks (`2.2.2.2/32`, `3.3.3.3/32`, `4.4.4.4/32`) show AS paths through Spine4 (AS 4).
+- Locally originated routes have next-hop `0.0.0.0` and weight `32768`.
+- For shared subnets (`1.4.1.0/24`), both a local and remote path exist — the local path (`*>`) wins.
 
-The AS-PATH is critical: leaf-01 (AS 65001) sees that to reach leaf-02 (AS 65002), the path transits through spine-01 (AS 65000). This is the normal eBGP transit behavior.
+---
 
-View specific prefix details including all paths:
-```
-cisco@leaf-01:~$ show bgp ipv4 unicast 2.2.2.2/32
-```
+### 4.4 Detailed BGP Neighbor Information
 
-Expected output:
-```
-BGP routing table entry for 2.2.2.2/32, version 2
-Paths: (1 available, best #1, table default)
-  Advertised to non peer-group peers:
-  10.1.1.1
-  65000 65002
-    10.1.1.1 from 10.1.1.1 (4.4.4.4)
-      Origin IGP, metric 0, localpref 100, weight 0, valid, external, best (First path received)
-      Last update: Mon Apr 13 12:05:22 2026
+Full session details: capabilities, timers, message counters, graceful restart state.
+
+```bash
+vtysh -c 'show bgp neighbors 1.4.1.4'
 ```
 
-### BGP IPv6 Routing Table
-
+**Leaf1** output:
 ```
-cisco@leaf-01:~$ show bgp ipv6 unicast
+BGP neighbor is 1.4.1.4, remote AS 4, local AS 1, external link
+  Local Role: undefined
+  Remote Role: undefined
+Hostname: pod12-spine4
+ Member of peer-group SPINE for session parameters
+  BGP version 4, remote router ID 4.4.4.4, local router ID 1.1.1.1
+  BGP state = Established, up for 00:00:32
+  Last read 00:00:30, Last write 00:00:31
+  Hold time is 180 seconds, keepalive interval is 60 seconds
+  Neighbor capabilities:
+    4 Byte AS: advertised and received
+    Extended Message: advertised and received
+    AddPath:
+      IPv4 Unicast: RX advertised and received
+    Long-lived Graceful Restart: advertised and received
+    Route refresh: advertised and received(old & new)
+    Enhanced Route Refresh: advertised and received
+    Address Family IPv4 Unicast: advertised and received
+    Hostname Capability: advertised (name: pod12-leaf1,domain name: n/a) received (name: pod12-spine4,domain name: n/a)
+    Graceful Restart Capability: advertised and received
+      Remote Restart timer is 120 seconds
+  Graceful restart information:
+    End-of-RIB send: IPv4 Unicast
+    End-of-RIB received: IPv4 Unicast
+    Local GR Mode: Helper*
+    Remote GR Mode: Helper
+  Message statistics:
+                         Sent       Rcvd
+    Opens:                  3          3
+    Notifications:          2          0
+    Updates:                4         20
+    Keepalives:             3          2
+    Route Refresh:          0          0
+    Total:                 12         25
+
+ For address family: IPv4 Unicast
+  SPINE peer-group member
+  Route map for incoming advertisements is *PASS
+  Route map for outgoing advertisements is *ADVERTISE
+  8 accepted prefixes
+
+  Connections established 2; dropped 1
+Local host: 1.4.1.1, Local port: 179
+Foreign host: 1.4.1.4, Foreign port: 43234
 ```
 
-Expected output:
-```
-BGP table version is 4, local router ID is 1.1.1.1, vrf id 0
-Default local pref 100, local AS 65001
-Status codes:  s suppressed, d damped, h history, * valid, > best, = multipath,
-               i internal, r RIB-failure, S Stale, R Removed
+Key fields to verify:
+- **BGP state = Established** — session is up and exchanging routes.
+- **Hold time / keepalive** — default 180s/60s. If the hold timer expires, the session drops.
+- **Route map for incoming / outgoing** — confirms `PASS` inbound and `ADVERTISE` outbound.
+- **8 accepted prefixes** — matches what `show bgp summary` reports.
+- **Connections established / dropped** — high drop counts indicate instability.
 
-   Network                   Next Hop              Metric LocPrf Weight Path
-*> fc00:0:1::1/128           ::                       0         32768 i
-*> fc00:0:2::1/128           2001:db8:1:1::1          0             0 65000 65002 i
-*> fc00:0:3::1/128           2001:db8:1:1::1          0             0 65000 65003 i
-*> fc00:0:4::1/128           2001:db8:1:1::1          0             0 65000 i
+---
 
-Displayed  4 routes and 4 total paths
-```
+### 4.5 Route-Map Verification
 
-### IPv4 Routing Table
+Shows invocation counts — how many times each route-map was evaluated and how many routes matched.
 
-Confirm BGP routes are installed in the kernel routing table:
-
-```
-cisco@leaf-01:~$ show ip route
+```bash
+vtysh -c 'show route-map'
 ```
 
-Expected output:
+**Leaf1** output:
+```
+ZEBRA:
+route-map: RM_SET_SRC Invoked: 10
+ permit, sequence 10 Invoked 10
+  Set clauses:
+    src 1.1.1.1
+
+BGP:
+route-map: ADVERTISE Invoked: 18
+ permit, sequence 10 Invoked 2
+  Match clauses:
+    ip address prefix-list LOOPBACKS
+
+route-map: PASS Invoked: 16
+ permit, sequence 10 Invoked 16
+  Match clauses:
+```
+
+- `ADVERTISE Invoked 2` out of 18 evaluations — only the loopback matched. The rest were implicitly denied (connected subnets filtered out).
+- `PASS Invoked 16` — all inbound prefixes passed through.
+- `RM_SET_SRC Invoked 10` — applied to BGP routes installed into the kernel, setting the loopback as source.
+
+---
+
+### 4.6 FRR IP Route Table
+
+`B>*` = best BGP route installed in FIB. `C>*` = directly connected. `rmapsrc` confirms the source-address route-map is working.
+
+```bash
+vtysh -c 'show ip route'
+```
+
+**Leaf1** output:
 ```
 Codes: K - kernel route, C - connected, S - static, R - RIP,
        O - OSPF, I - IS-IS, B - BGP, E - EIGRP, N - NHRP,
        T - Table, v - VNC, V - VNC-Direct, A - Babel, F - PBR,
-       f - OpenFabric,
+       f - OpenFabric, J - Adjacency,
        > - selected route, * - FIB route, q - queued, r - rejected, b - backup
+       t - trapped, o - offload failure
 
-B>* 2.2.2.2/32 [20/0] via 10.1.1.1, Ethernet0, weight 1, 00:05:31
-B>* 3.3.3.3/32 [20/0] via 10.1.1.1, Ethernet0, weight 1, 00:04:12
-B>* 4.4.4.4/32 [20/0] via 10.1.1.1, Ethernet0, weight 1, 00:05:31
-C>* 10.1.1.0/31 is directly connected, Ethernet0, 02:14:05
-C>* 1.1.1.1/32 is directly connected, Loopback0, 02:14:05
+K * 0.0.0.0/0 [0/202] via 192.168.122.1, eth0, 00:06:40
+K>* 0.0.0.0/0 [0/0] via 192.168.123.1, eth4, 00:06:40
+C>* 1.1.1.1/32 is directly connected, Loopback0, 00:05:28
+C>* 1.4.1.0/24 is directly connected, Ethernet0, 00:02:19
+B>* 2.2.2.2/32 [20/0] via 1.4.1.4, Ethernet0, rmapsrc 1.1.1.1, weight 1, 00:00:30
+B>* 2.4.1.0/24 [20/0] via 1.4.1.4, Ethernet0, rmapsrc 1.1.1.1, weight 1, 00:00:30
+B>* 3.3.3.3/32 [20/0] via 1.4.1.4, Ethernet0, rmapsrc 1.1.1.1, weight 1, 00:00:30
+B>* 3.4.1.0/24 [20/0] via 1.4.1.4, Ethernet0, rmapsrc 1.1.1.1, weight 1, 00:00:30
+B>* 4.4.4.4/32 [20/0] via 1.4.1.4, Ethernet0, rmapsrc 1.1.1.1, weight 1, 00:00:30
+C>* 192.168.122.0/24 is directly connected, eth0, 00:06:40
+C>* 192.168.123.0/24 is directly connected, eth4, 00:06:40
+K>* 240.127.1.0/24 [0/0] is directly connected, docker0, 00:06:40
 ```
 
-Key codes:
-- `B` = BGP-learned route
-- `C` = Connected route
-- `>*` = Selected best route, installed in FIB
+- `rmapsrc 1.1.1.1` — `RM_SET_SRC` is working, forcing the loopback as the source for BGP-learned routes.
+- `[20/0]` — administrative distance 20 (eBGP), metric 0.
 
-### IPv6 Routing Table
+---
 
-```
-cisco@leaf-01:~$ show ipv6 route
-```
-
-### End-to-End Reachability Test
-
-Verify loopback reachability across the fabric. From **leaf-01**, ping the loopback of every other device using the local loopback as the source:
-
-```
-cisco@leaf-01:~$ ping 2.2.2.2 -I 1.1.1.1 -c 3
-cisco@leaf-01:~$ ping 3.3.3.3 -I 1.1.1.1 -c 3
-cisco@leaf-01:~$ ping 4.4.4.4 -I 1.1.1.1 -c 3
-```
-
-Expected output (example for 2.2.2.2):
-```
-PING 2.2.2.2 (2.2.2.2) from 1.1.1.1 : 56(84) bytes of data.
-64 bytes from 2.2.2.2: icmp_seq=1 ttl=63 time=2.14 ms
-64 bytes from 2.2.2.2: icmp_seq=2 ttl=63 time=1.98 ms
-64 bytes from 2.2.2.2: icmp_seq=3 ttl=63 time=2.01 ms
-
---- 2.2.2.2 ping statistics ---
-3 packets transmitted, 3 received, 0% packet loss, time 2003ms
-rtt min/avg/max/mdev = 1.980/2.043/2.140/0.069 ms
-```
-
-Notice the `ttl=63` (decremented by 1 at the spine) confirming the packet transited through spine-01.
-
-Test IPv6 loopback reachability:
-```
-cisco@leaf-01:~$ ping6 fc00:0:2::1 -I fc00:0:1::1 -c 3
-cisco@leaf-01:~$ ping6 fc00:0:3::1 -I fc00:0:1::1 -c 3
-cisco@leaf-01:~$ ping6 fc00:0:4::1 -I fc00:0:1::1 -c 3
-```
-
-### BGP Route Advertisement Verification
-
-Confirm what leaf-01 is advertising to spine-01:
-
-```
-cisco@leaf-01:~$ show bgp neighbors 10.1.1.1 advertised-routes
-```
-
-Expected output:
-```
-BGP table version is 4, local router ID is 1.1.1.1, vrf id 0
-Default local pref 100, local AS 65001
-
-   Network          Next Hop            Metric LocPrf Weight Path
-*> 1.1.1.1/32       0.0.0.0                  0         32768 i
-
-Total number of prefixes 1
-```
-
-Confirm what routes leaf-01 has received from spine-01:
-
-```
-cisco@leaf-01:~$ show bgp neighbors 10.1.1.1 received-routes
-```
-
-### Understanding the BGP Output in Detail
-
-Let's decode the full BGP summary output field by field on **spine-01**:
-
-```
-cisco@spine-01:~$ show bgp summary
-```
-
-```
-IPv4 Unicast Summary (VRF default):
-BGP router identifier 4.4.4.4, local AS number 65000 vrf-id 0
-BGP table version 7
-RIB entries 7, using 1288 bytes of memory
-Peers 3, using 2171 KiB of memory
-
-Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
-10.1.1.0        4      65001       218       215        0    0    0 00:05:31            1        4 N/A
-10.1.1.2        4      65002       201       198        0    0    0 00:04:47            1        4 N/A
-10.1.1.4        4      65003       187       185        0    0    0 00:04:12            1        4 N/A
-```
-
-| Field          | Meaning                                                                 |
-|----------------|-------------------------------------------------------------------------|
-| `V`            | BGP version — always 4 (BGP-4)                                         |
-| `AS`           | Remote AS number                                                        |
-| `MsgRcvd`      | Total BGP messages received (OPEN + UPDATE + KEEPALIVE combined)       |
-| `MsgSent`      | Total BGP messages sent                                                 |
-| `TblVer`       | BGP table version at which this neighbor was last updated               |
-| `InQ / OutQ`   | Number of messages queued to be processed inbound / outbound           |
-| `Up/Down`      | How long the session has been in its current state                     |
-| `State/PfxRcd` | If Established: number of prefixes received. If not: current FSM state |
-| `PfxSnt`       | Number of prefixes advertised to this peer                              |
-
-**Reading `State/PfxRcd`:**
-- A number (e.g., `1`) → session is Established, received that many prefixes
-- `Idle` → session is administratively or automatically down
-- `Active` → BGP is retrying TCP connection
-- `Connect` → TCP SYN sent, waiting for response
-- `OpenSent` → TCP up, OPEN sent, waiting for peer's OPEN
-- `OpenConfirm` → OPENs exchanged, waiting for KEEPALIVE
-
-### BGP AS-PATH Analysis
-
-Use AS-PATH regular expressions to filter and analyze the BGP table on **spine-01**:
-
-```
-cisco@spine-01:~$ sudo vtysh -c "show bgp ipv4 unicast regexp ^65001"
-```
-
-This shows only routes whose AS-PATH starts with AS 65001 (i.e., routes originated by leaf-01).
-
-Other useful AS-PATH regex patterns:
-
-| Regex Pattern  | Matches                                          |
-|----------------|--------------------------------------------------|
-| `^$`           | Locally originated routes (empty AS_PATH)        |
-| `^65001$`      | Routes originated in AS 65001, one hop away      |
-| `^65000`       | Routes that transited through AS 65000 (spine)   |
-| `_65002_`      | Routes that passed through AS 65002 anywhere     |
-| `.*`           | All routes (wildcard)                            |
-
-### Observe BGP Session Establishment in Real Time
-
-To watch a BGP session come up from scratch, clear a session and observe the state transitions:
-
-```
-cisco@leaf-01:~$ sudo vtysh
-leaf-01# clear bgp 10.1.1.1
-```
-
-This sends a NOTIFICATION to the peer and resets the TCP session. In another terminal, watch the session state:
-
-```
-cisco@leaf-01:~$ watch -n 1 "sudo vtysh -c 'show bgp summary' 2>/dev/null | grep 10.1.1.1"
-```
-
-You should see the session cycle through: `Active` → `Connect` → `OpenSent` → `OpenConfirm` → `1` (Established with 1 prefix received).
-
-### BGP Packet Capture
-
-To observe actual BGP messages on the wire, use tcpdump. In one terminal:
-
-```
-cisco@leaf-01:~$ sudo tcpdump -i Ethernet0 tcp port 179 -v
-```
-
-In another terminal, reset the BGP session:
-```
-cisco@leaf-01:~$ sudo vtysh -c "clear bgp 10.1.1.1"
-```
-
-You will see the TCP 3-way handshake followed by BGP OPEN messages, then KEEPALIVE exchange, then UPDATE messages carrying the routes.
-
-To decode BGP messages in full detail:
-```
-cisco@leaf-01:~$ sudo tcpdump -i Ethernet0 tcp port 179 -w /tmp/bgp_capture.pcap
-```
-
-### BGP Route Filtering Debug
-
-To see exactly which routes are being accepted or rejected by route-maps, enable BGP debug:
-
-```
-cisco@leaf-01:~$ sudo vtysh
-leaf-01# debug bgp updates in
-leaf-01# debug bgp updates out
-```
-
-> **Warning:** Debug logging can be very verbose on a busy router. Always disable after use with `no debug bgp updates`.
-
-View the debug output in the FRR log:
-```
-cisco@leaf-01:~$ docker exec bgp tail -f /var/log/frr/bgpd.log
-```
-
-### Check Next-Hop Tracking State
-
-Verify that FRR's NHT (Next-Hop Tracking) considers the spine's IP as reachable:
-
-```
-cisco@leaf-01:~$ sudo vtysh -c "show bgp nexthop"
-```
-
-Expected output:
-```
-Current BGP nexthop cache:
- 10.1.1.1 valid [IGP metric 0], #paths 3
-  gate via 10.1.1.1, Ethernet0
-  Last update: Mon Apr 13 12:05:20 2026
-```
-
-The `valid` status confirms that zebra has verified the next-hop 10.1.1.1 is reachable via a connected route on Ethernet0.
-
-### Additional Verification Commands
-
-| Command | Description |
-|---------|-------------|
-| `show bgp ipv4 unicast community` | Show routes with BGP communities |
-| `show bgp ipv4 unicast statistics` | BGP RIB statistics |
-| `show bgp memory` | BGP memory usage per peer and table |
-| `show bgp vrfs` | BGP VRF table summary |
-| `show ip route summary` | Routing table summary by protocol |
-| `show bgp ipv4 unicast regexp ^65000` | Filter BGP table by AS-PATH regex |
-| `show bgp neighbors X advertised-routes` | Prefixes sent to neighbor X |
-| `show bgp neighbors X received-routes` | All prefixes received from X (before policy) |
-| `show bgp neighbors X routes` | Prefixes received and accepted from X |
-| `show bgp nexthop` | NHT state — validity of all tracked next-hops |
-| `show bgp update-groups` | BGP update group membership |
-| `show bgp peer-group` | Peer group configuration |
-
-### BGP Troubleshooting Reference
-
-| Symptom | Likely Cause | Where to Check |
-|---------|-------------|----------------|
-| Peer stuck in `Active` | TCP unreachable | `ping 10.1.1.1`; check `show interface status` |
-| Peer stuck in `Idle` | Policy required / admin down | Check `no bgp ebgp-requires-policy`; `show bgp neighbors X` for shutdown message |
-| Session up but no prefixes | `activate` missing in address-family | `show bgp neighbors X` — check "Address family IPv4 Unicast: not advertised" |
-| Route in BGP RIB but not in `ip route` | Next-hop unreachable | `show bgp nexthop`; verify NHT shows `valid` |
-| Route in `ip route` but not in hardware | SAI/orchagent issue | Check `redis-cli -n 1 keys "*ROUTE*"` in ASIC_DB |
-| `State/PfxRcd` shows 0 | Peer has no matching prefix | Verify `network` statement on the remote peer |
-| NOTIFICATION received | Misconfiguration | Check `docker exec bgp cat /var/log/frr/bgpd.log` for error code |
-
-
-## Redis Database Verification
-
-### SONiC Redis Architecture
-
-SONiC uses Redis as the central message bus and state store. Multiple Redis databases (selected by index number) serve different subsystems:
-
-| DB Index | Name          | Contents                                        |
-|----------|---------------|-------------------------------------------------|
-| 0        | APPL_DB       | Applied configuration: routes, neighbors, interfaces |
-| 1        | ASIC_DB       | ASIC programming state (SAI objects)            |
-| 2        | COUNTERS_DB   | Interface and ACL counters                      |
-| 3        | LOGLEVEL_DB   | Daemon log level settings                       |
-| 4        | CONFIG_DB     | Startup configuration (mirrors config_db.json)  |
-| 5        | PFC_WD_DB     | PFC watchdog                                    |
-| 6        | STATE_DB      | Runtime operational state                       |
-
-When FRR's `bgpd` installs a route, the flow is:
-
-```
-bgpd → zebra → kernel FIB → fpmsyncd → APPL_DB:ROUTE_TABLE → orchagent → ASIC_DB → ASIC
-```
-
-The Redis database lets us inspect each step of this pipeline.
-
-### Querying Routes in APPL_DB
-
-List all BGP-installed routes in the application database:
-
-```
-cisco@leaf-01:~$ redis-cli -n 0 keys "ROUTE_TABLE:*"
-```
-
-Expected output:
-```
-1) "ROUTE_TABLE:2.2.2.2/32"
-2) "ROUTE_TABLE:3.3.3.3/32"
-3) "ROUTE_TABLE:4.4.4.4/32"
-```
-
-> **Note:** The locally connected routes and loopback are typically not in ROUTE_TABLE — they are in INTF_TABLE and NEIGH_TABLE respectively.
-
-Get the full route entry for a specific prefix:
-
-```
-cisco@leaf-01:~$ redis-cli -n 0 hgetall "ROUTE_TABLE:2.2.2.2/32"
-```
-
-Expected output:
-```
-1) "nexthop"
-2) "10.1.1.1"
-3) "ifname"
-4) "Ethernet0"
-5) "blackhole"
-6) "false"
-```
-
-This shows that the route to 2.2.2.2/32 is programmed with next-hop 10.1.1.1 via Ethernet0 — exactly matching what FRR resolved.
-
-### Querying All Route Entries
-
-Get all BGP routes and their attributes in a single pass:
-
-```
-cisco@leaf-01:~$ for key in $(redis-cli -n 0 keys "ROUTE_TABLE:*"); do
-    echo "--- $key ---"
-    redis-cli -n 0 hgetall "$key"
-done
-```
-
-### Querying CONFIG_DB for Device Metadata
-
-Confirm the BGP ASN as stored in CONFIG_DB:
-
-```
-cisco@leaf-01:~$ redis-cli -n 4 hgetall "DEVICE_METADATA|localhost"
-```
-
-Expected output:
-```
- 1) "hostname"
- 2) "leaf-01"
- 3) "bgp_asn"
- 4) "65001"
- 5) "docker_routing_config_mode"
- 6) "split"
- 7) "buffer_model"
- 8) "traditional"
- 9) "switch_type"
-10) "switch"
-11) "mac"
-12) "02:42:ac:14:06:64"
-```
-
-This confirms that CONFIG_DB holds the `bgp_asn` and `docker_routing_config_mode` values loaded from `config_db.json`.
-
-### Querying Interface Configuration in CONFIG_DB
-
-View how Ethernet0's IP address is stored in CONFIG_DB:
-
-```
-cisco@leaf-01:~$ redis-cli -n 4 hgetall "INTERFACE|Ethernet0|10.1.1.0/31"
-```
-
-Expected output:
-```
-(empty array)
-```
-
-> **Note:** In SONiC, an empty hash for an interface IP key is valid — the key existence itself signals that the IP is configured. The IP is encoded in the key name itself (`INTERFACE|Ethernet0|10.1.1.0/31`).
-
-List all interface keys:
-```
-cisco@leaf-01:~$ redis-cli -n 4 keys "INTERFACE|*"
-```
-
-Expected output:
-```
-1) "INTERFACE|Ethernet0"
-2) "INTERFACE|Ethernet0|10.1.1.0/31"
-3) "INTERFACE|Ethernet0|2001:db8:1:1::0/127"
-4) "INTERFACE|Ethernet8"
-```
-
-### Querying BGP Neighbor State in STATE_DB
-
-Check the operational state of BGP neighbors as seen by SONiC's state database:
-
-```
-cisco@leaf-01:~$ redis-cli -n 6 keys "BGP_NEIGHBOR_TABLE|*"
-```
-
-Expected output:
-```
-1) "BGP_NEIGHBOR_TABLE|default|10.1.1.1"
-2) "BGP_NEIGHBOR_TABLE|default|2001:db8:1:1::1"
-```
-
-Get the state of the IPv4 BGP neighbor:
-```
-cisco@leaf-01:~$ redis-cli -n 6 hgetall "BGP_NEIGHBOR_TABLE|default|10.1.1.1"
-```
-
-Expected output:
-```
-1) "state"
-2) "Established"
-3) "local_port"
-4) "51234"
-5) "remote_port"
-6) "179"
-7) "local_addr"
-8) "10.1.1.0"
-9) "peer_addr"
-10) "10.1.1.1"
-```
-
-### Querying the Loopback Interface in APPL_DB
-
-```
-cisco@leaf-01:~$ redis-cli -n 0 keys "INTF_TABLE:Loopback0*"
-```
-
-Expected output:
-```
-1) "INTF_TABLE:Loopback0"
-2) "INTF_TABLE:Loopback0:1.1.1.1/32"
-3) "INTF_TABLE:Loopback0:fc00:0:1::1/128"
-```
-
-### Monitoring Route Installation
-
-To watch routes being programmed into APPL_DB in real time (useful during troubleshooting), use the Redis `monitor` command:
-
-```
-cisco@leaf-01:~$ redis-cli -n 0 monitor
-```
-
-> Press `Ctrl+C` to stop monitoring. This is equivalent to a debug session — use it when you need to watch live state changes.
-
-### Verify Route in ASIC_DB (Hardware Programming)
-
-After the route flows through APPL_DB and orchagent, it should appear in ASIC_DB as a SAI route entry. This confirms the route has been sent to the hardware driver:
-
-```
-cisco@leaf-01:~$ redis-cli -n 1 keys "ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:*"
-```
-
-Expected output (showing the BGP-learned routes alongside connected routes):
-```
-1) "ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{\"dest\":\"2.2.2.2/32\",\"switch_id\":\"oid:0x21000000000000\",\"vr_id\":\"oid:0x3000000000022\"}"
-2) "ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{\"dest\":\"3.3.3.3/32\",\"switch_id\":\"oid:0x21000000000000\",\"vr_id\":\"oid:0x3000000000022\"}"
-3) "ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{\"dest\":\"4.4.4.4/32\",\"switch_id\":\"oid:0x21000000000000\",\"vr_id\":\"oid:0x3000000000022\"}"
-```
-
-Get the details of one ASIC route entry to see the next-hop object ID:
-```
-cisco@leaf-01:~$ redis-cli -n 1 hgetall "ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{\"dest\":\"2.2.2.2/32\",\"switch_id\":\"oid:0x21000000000000\",\"vr_id\":\"oid:0x3000000000022\"}"
-```
-
-Expected output:
-```
-1) "SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID"
-2) "oid:0x400000000061e"
-```
-
-The `oid:` (Object ID) is the SAI handle for the next-hop group object. You can further inspect this next-hop:
-```
-cisco@leaf-01:~$ redis-cli -n 1 hgetall "ASIC_STATE:SAI_OBJECT_TYPE_NEXT_HOP:oid:0x400000000061e"
-```
+### 4.7 Route Programming & Nexthop Resolution — Kernel, APP_DB, and ASIC
 
-This level of inspection confirms the full path: BGP RIB → Linux kernel → APPL_DB → ASIC_DB → hardware FIB.
+A route in the BGP RIB is useless unless it is programmed all the way down to the hardware ASIC and the next-hop can be resolved to a directly connected neighbor. This section traces the full route-programming chain from the Linux kernel through SONiC's APP_DB down to the hardware ASIC, and shows how the nexthop is resolved at each layer.
 
-### Verify the Full Pipeline in One Pass
+#### Linux Kernel Route Table
 
-Here is a consolidated verification sequence that walks the entire SONiC route pipeline for `2.2.2.2/32`:
+The kernel is what actually forwards packets. `proto bgp` confirms FRR (Zebra) programmed the route. The `src` field shows the source address set by `RM_SET_SRC`.
 
 ```bash
-echo "=== 1. FRR BGP RIB ===" 
-sudo vtysh -c "show bgp ipv4 unicast 2.2.2.2/32"
-
-echo "=== 2. Linux Kernel FIB ===" 
-ip route show 2.2.2.2/32
-
-echo "=== 3. SONiC APPL_DB (fpmsyncd output) ===" 
-redis-cli -n 0 hgetall "ROUTE_TABLE:2.2.2.2/32"
-
-echo "=== 4. SONiC ASIC_DB (orchagent output) ===" 
-redis-cli -n 1 keys "ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:*2.2.2.2*"
+ip route show proto bgp
 ```
 
-Each step should show the route — if any step is missing the route, you have found where the pipeline is broken.
-
-### Watching CONFIG_DB Populated from config_db.json
-
-To understand how the interface configuration from `config_db.json` is reflected in CONFIG_DB:
-
+**Leaf1** output:
 ```
-cisco@leaf-01:~$ redis-cli -n 4 keys "LOOPBACK_INTERFACE|*"
-```
-
-Expected output:
-```
-1) "LOOPBACK_INTERFACE|Loopback0"
-2) "LOOPBACK_INTERFACE|Loopback0|1.1.1.1/32"
-3) "LOOPBACK_INTERFACE|Loopback0|fc00:0:1::1/128"
+2.2.2.2 via 1.4.1.4 dev Ethernet0 src 1.1.1.1 metric 20
+2.4.1.0/24 via 1.4.1.4 dev Ethernet0 src 1.1.1.1 metric 20
+3.3.3.3 via 1.4.1.4 dev Ethernet0 src 1.1.1.1 metric 20
+3.4.1.0/24 via 1.4.1.4 dev Ethernet0 src 1.1.1.1 metric 20
+4.4.4.4 via 1.4.1.4 dev Ethernet0 src 1.1.1.1 metric 20
 ```
 
-The key pattern `TABLE|interface|prefix` is SONiC's standard encoding: the interface is identified by name and the IP prefix is encoded in the key itself. The hash value is often empty — the key's existence is the data.
+If `src` showed `1.4.1.1` (the Ethernet0 address) instead of `1.1.1.1` (the loopback), the `RM_SET_SRC` route-map is missing or not applied.
 
-Verify the interface-level metadata:
-```
-cisco@leaf-01:~$ redis-cli -n 4 hgetall "PORT|Ethernet0"
-```
+#### Linux ARP / Neighbor Table
 
-Expected output:
-```
- 1) "alias"
- 2) "etp0"
- 3) "index"
- 4) "0"
- 5) "lanes"
- 6) "2304,2305,2306,2307,2308,2309,2310,2311"
- 7) "mtu"
- 8) "9100"
- 9) "speed"
-10) "400000"
-11) "admin_status"
-12) "up"
+For the kernel to forward to `1.4.1.4`, it needs the MAC address of that next-hop. The ARP table shows the L2 resolution.
+
+```bash
+ip neigh show dev Ethernet0
 ```
 
-This directly mirrors the `PORT` table in `config_db.json` from Lab 1, confirming the config load pipeline worked correctly.
-
-### Redis Subscribe — Watch Live Route Events
-
-Redis supports a publish/subscribe model. SONiC uses this to notify processes of table changes. You can observe live events as routes are programmed:
-
+**Leaf1** output:
 ```
-cisco@leaf-01:~$ redis-cli -n 0 psubscribe "__keyevent@0__:hset"
+1.4.1.4 lladdr 78:61:32:bf:bc:00 REACHABLE
 ```
 
-In another terminal, reset the BGP session:
+The next-hop is `REACHABLE`. If it shows `FAILED` or `INCOMPLETE`, L2 adjacency is broken (check interface state, cabling, or IP mismatch).
+
+#### SONiC APP_DB (ROUTE_TABLE and NEIGH_TABLE)
+
+FRR pushes routes to the SONiC `fpmsyncd` daemon via the FPM (Forwarding Plane Manager) socket. `fpmsyncd` writes them into APP_DB's `ROUTE_TABLE`, which `orchagent` then programs into the ASIC.
+
+List all routes in APP_DB:
+
+```bash
+sonic-db-cli APPL_DB keys 'ROUTE_TABLE:*'
 ```
-cisco@leaf-01:~$ sudo vtysh -c "clear bgp 10.1.1.1"
+
+**Leaf1** output:
+```
+ROUTE_TABLE:0.0.0.0/0
+ROUTE_TABLE:1.1.1.1
+ROUTE_TABLE:1.4.1.0/24
+ROUTE_TABLE:2.2.2.2
+ROUTE_TABLE:2.4.1.0/24
+ROUTE_TABLE:3.3.3.3
+ROUTE_TABLE:3.4.1.0/24
+ROUTE_TABLE:4.4.4.4
 ```
 
-You will see Redis keyevent notifications fired each time fpmsyncd writes a route to APPL_DB — one event per prefix as the BGP table is re-established.
+Inspect a specific route to see the nexthop and egress interface:
 
-Press `Ctrl+C` to stop subscribing.
+```bash
+sonic-db-cli APPL_DB hgetall 'ROUTE_TABLE:2.2.2.2'
+```
 
-### Redis CLI Reference
+```
+{'protocol': 'bgp', 'nexthop': '1.4.1.4', 'ifname': 'Ethernet0'}
+```
 
-| Command | Description |
-|---------|-------------|
-| `redis-cli -n 0 keys "*"` | List all keys in APPL_DB |
-| `redis-cli -n 0 hgetall "KEY"` | Get all fields of a hash key |
-| `redis-cli -n 1 keys "ASIC_STATE*ROUTE*"` | Route entries in ASIC_DB |
-| `redis-cli -n 4 keys "BGP*"` | Find BGP-related keys in CONFIG_DB |
-| `redis-cli -n 6 keys "*"` | List all keys in STATE_DB |
-| `redis-cli -n 0 dbsize` | Count all keys in APPL_DB |
-| `redis-cli info keyspace` | Show key counts across all databases |
-| `redis-cli -n 0 monitor` | Live stream of all APPL_DB operations |
-| `redis-cli -n 0 psubscribe "__keyevent@0__:hset"` | Subscribe to APPL_DB write events |
+```bash
+sonic-db-cli APPL_DB hgetall 'ROUTE_TABLE:4.4.4.4'
+```
 
+```
+{'protocol': 'bgp', 'nexthop': '1.4.1.4', 'ifname': 'Ethernet0'}
+```
 
-## End of Lab 2
+All remote loopbacks point to nexthop `1.4.1.4` via `Ethernet0`.
 
-You have successfully:
-- Configured eBGP sessions between three leaves and one spine using FRR's `vtysh`
-- Advertised loopback prefixes across the BGP fabric
-- Verified BGP session state, learned prefixes, and AS-PATH attributes
-- Confirmed end-to-end IPv4 and IPv6 reachability across the fabric
-- Inspected how BGP routing state is stored and propagated through SONiC's Redis database pipeline
+The neighbor's MAC is stored in NEIGH_TABLE — this is what `orchagent` uses to program the ASIC's L2 rewrite entry:
 
-Lab 2 is completed, please proceed to [Lab 3](https://github.com/cisco-asp-web/SONiC/blob/main/lab_3/lab_3-guide.md)
+```bash
+sonic-db-cli APPL_DB hgetall 'NEIGH_TABLE:Ethernet0:1.4.1.4'
+```
+
+```
+{'neigh': '78:61:32:bf:bc:00', 'family': 'IPv4'}
+```
+
+This matches the ARP entry from `ip neigh show`.
+
+#### SONiC ASIC_DB (SAI Object Store)
+
+> **Where does ASIC_DB fit?** `orchagent` reads from APP_DB, translates routes/neighbors into SAI (Switch Abstraction Interface) objects, and writes them to ASIC_DB. The SAI SDK then programs the actual hardware. ASIC_DB is therefore the *canonical record* of what `orchagent` asked the ASIC to do — if a route is in APP_DB but missing from ASIC_DB, `orchagent` failed to process it.
+>
+> The `show platform npu` commands (next section) read back from the hardware directly. ASIC_DB shows you what was *requested*; the NPU CLI shows you what was *programmed*.
+
+ASIC_DB keys are SAI object types with JSON-encoded key fields. The main ones for route verification are:
+
+| SAI Object Type | What it stores |
+|-----------------|----------------|
+| `SAI_OBJECT_TYPE_ROUTE_ENTRY` | Prefix → nexthop OID mapping |
+| `SAI_OBJECT_TYPE_NEXT_HOP` | Nexthop IP + router interface OID |
+| `SAI_OBJECT_TYPE_NEIGHBOR_ENTRY` | Neighbor IP → destination MAC |
+| `SAI_OBJECT_TYPE_ROUTER_INTERFACE` | Interface → port OID, source MAC, MTU |
+
+##### List all route entries
+
+```bash
+sonic-db-cli ASIC_DB keys 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:*'
+```
+
+**Leaf1** output (IPv4 entries only):
+```
+ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{"dest":"2.2.2.2/32","switch_id":"oid:0x21000000000000","vr":"oid:0x3000000000042"}
+ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{"dest":"3.3.3.3/32","switch_id":"oid:0x21000000000000","vr":"oid:0x3000000000042"}
+ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{"dest":"4.4.4.4/32","switch_id":"oid:0x21000000000000","vr":"oid:0x3000000000042"}
+ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{"dest":"1.1.1.1/32","switch_id":"oid:0x21000000000000","vr":"oid:0x3000000000042"}
+ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{"dest":"1.4.1.0/24","switch_id":"oid:0x21000000000000","vr":"oid:0x3000000000042"}
+ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{"dest":"2.4.1.0/24","switch_id":"oid:0x21000000000000","vr":"oid:0x3000000000042"}
+ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{"dest":"3.4.1.0/24","switch_id":"oid:0x21000000000000","vr":"oid:0x3000000000042"}
+ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{"dest":"0.0.0.0/0","switch_id":"oid:0x21000000000000","vr":"oid:0x3000000000042"}
+```
+
+##### Trace a single route through ASIC_DB
+
+Look up the route entry for `2.2.2.2/32` to find the nexthop OID it points to:
+
+```bash
+sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{"dest":"2.2.2.2/32","switch_id":"oid:0x21000000000000","vr":"oid:0x3000000000042"}'
+```
+
+```
+{'SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID': 'oid:0x400000000097e'}
+```
+
+Follow the nexthop OID to find the IP and router interface:
+
+```bash
+sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_NEXT_HOP:oid:0x400000000097e'
+```
+
+```
+{'SAI_NEXT_HOP_ATTR_TYPE': 'SAI_NEXT_HOP_TYPE_IP', 'SAI_NEXT_HOP_ATTR_IP': '1.4.1.4', 'SAI_NEXT_HOP_ATTR_ROUTER_INTERFACE_ID': 'oid:0x600000000096b'}
+```
+
+Look up the neighbor entry for `1.4.1.4` to find the destination MAC:
+
+```bash
+sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:{"ip":"1.4.1.4","rif":"oid:0x600000000096b","switch_id":"oid:0x21000000000000"}'
+```
+
+```
+{'SAI_NEIGHBOR_ENTRY_ATTR_DST_MAC_ADDRESS': '78:61:32:BF:BC:00'}
+```
+
+Optionally, check the router interface to confirm the egress port and source MAC:
+
+```bash
+sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTER_INTERFACE:oid:0x600000000096b'
+```
+
+```
+{'SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID': 'oid:0x3000000000042', 'SAI_ROUTER_INTERFACE_ATTR_SRC_MAC_ADDRESS': '78:EC:2B:CF:A8:00', 'SAI_ROUTER_INTERFACE_ATTR_TYPE': 'SAI_ROUTER_INTERFACE_TYPE_PORT', 'SAI_ROUTER_INTERFACE_ATTR_PORT_ID': 'oid:0x1000000000002', 'SAI_ROUTER_INTERFACE_ATTR_MTU': '9100'}
+```
+
+The full ASIC_DB chain for `2.2.2.2/32`:
+
+```
+Route  →  nexthop OID 0x400000000097e
+           →  IP 1.4.1.4, router-interface OID 0x600000000096b
+                →  dst-MAC 78:61:32:BF:BC:00 (neighbor entry)
+                →  src-MAC 78:EC:2B:CF:A8:00, port OID 0x1000000000002, MTU 9100 (router interface)
+```
+
+> **Note:** All BGP-learned routes (`2.2.2.2/32`, `3.3.3.3/32`, `4.4.4.4/32`, etc.) point to the same nexthop OID `0x400000000097e` because they all resolve via the single nexthop `1.4.1.4` on Ethernet0.
+
+#### ASIC / NPU Verification (show platform npu)
+
+These commands query the hardware ASIC directly. If a route is in APP_DB but not in the NPU route table, `orchagent` failed to program it.
+
+##### NPU Route Table
+
+Shows every prefix programmed into the ASIC. `dest-type` tells you what happens to matching packets:
+- `next-hop` — forwarded via a resolved nexthop (normal routing)
+- `for-us` — destined to the switch itself (local IPs)
+- `host` — connected subnet (glean/ARP resolution)
+
+```bash
+sudo show platform npu router route-table
+```
+
+**Leaf1** output:
+```
++-----------+----------------+-----------+---------------------------------+-------+--------+
+| router-id | ip-prefix      | dest-type | dest-info                       | drop  | ip-ver |
++-----------+----------------+-----------+---------------------------------+-------+--------+
+| 0x0       | 1.1.1.1/32     | for-us    | N/A                             | False | 4      |
+| 0x0       | 1.4.1.1/32     | for-us    | N/A                             | False | 4      |
+| 0x0       | 1.4.1.0/24     | host      | N/A                             | False | 4      |
+| 0x0       | 2.2.2.2/32     | next-hop  | ['normal', '78:61:32:bf:bc:00'] | False | 4      |
+| 0x0       | 2.4.1.0/24     | next-hop  | ['normal', '78:61:32:bf:bc:00'] | False | 4      |
+| 0x0       | 3.3.3.3/32     | next-hop  | ['normal', '78:61:32:bf:bc:00'] | False | 4      |
+| 0x0       | 3.4.1.0/24     | next-hop  | ['normal', '78:61:32:bf:bc:00'] | False | 4      |
+| 0x0       | 4.4.4.4/32     | next-hop  | ['normal', '78:61:32:bf:bc:00'] | False | 4      |
+| 0x0       | 0.0.0.0/0      | next-hop  | drop                            | True  | 4      |
++-----------+----------------+-----------+---------------------------------+-------+--------+
+```
+
+- All BGP-learned prefixes (`2.2.2.2/32`, `3.3.3.3/32`, `4.4.4.4/32`) are `next-hop` type with MAC `78:61:32:bf:bc:00` (Spine4's Ethernet0 MAC).
+- Local IPs (`1.1.1.1/32`, `1.4.1.1/32`) are `for-us` — packets to these addresses are punted to the CPU.
+- The connected subnet (`1.4.1.0/24`) is `host` type — triggers ARP resolution for unknown destinations in that range.
+- Default route (`0.0.0.0/0`) shows `drop: True` — unmatched traffic is dropped in hardware.
+
+##### NPU Prefix-to-Nexthop Mapping
+
+Drills into a single prefix and shows the full ASIC forwarding chain: VRF → prefix → nexthop OID → destination MAC → egress L3 port → physical interface.
+
+```bash
+sudo show platform npu router prefix -ip 2.2.2.2/32
+```
+
+**Leaf1** output:
+```
++-------------+------------+---------+------------------+-----------------+
+|   vrf oid   |   Prefix   | Is Host | Destination Type | Destination OID |
++-------------+------------+---------+------------------+-----------------+
+| la_vrf(265) | 2.2.2.2/32 |  False  |     NEXT_HOP     |      10489      |
++-------------+------------+---------+------------------+-----------------+
+
++-------+-------------------+--------------+-----------------------+-----------+
+|  oid  |    Nexthop MAC    | Nexthop Type | router port(type/oid) |   IfName  |
++-------+-------------------+--------------+-----------------------+-----------+
+| 10489 | 78:61:32:bf:bc:00 |  NORMAL(0)   |   la_l3_ac_port/618   | Ethernet0 |
++-------+-------------------+--------------+-----------------------+-----------+
+```
+
+The prefix `2.2.2.2/32` is in VRF `la_vrf(265)`, points to nexthop OID `10489`, which rewrites the dst-MAC to `78:61:32:bf:bc:00` and egresses via `Ethernet0`.
+
+##### NPU Next-Hop Table
+
+Shows all nexthop entries programmed in the ASIC, their MAC addresses, and reference counts.
+
+```bash
+sudo show platform npu next-hop entries
+```
+
+**Leaf1** output:
+```
++-------+-------------+-------------------+-----------+---------------+
+| index | next-hop-id | mac-addr          | ref-count | next-hop-type |
++-------+-------------+-------------------+-----------+---------------+
+| 0     | 0xfff       | None              | 0         | DROP          |
+| 1     | 0x0         | None              | 3         | DROP          |
+| 2     | 0x1         | 78:61:32:bf:bc:00 | 6         | NORMAL        |
++-------+-------------+-------------------+-----------+---------------+
+```
+
+- Leaf1 has a single `NORMAL` nexthop (Spine4's MAC) with `ref-count 6` — six prefixes reference this nexthop (the five BGP routes + one connected subnet via the spine).
+- Two `DROP` entries are system defaults.
+
+#### Resolution Chain Summary
+
+A packet to `2.2.2.2` on Leaf1 is forwarded as follows:
+
+```
+BGP RIB           →  2.2.2.2/32 via 1.4.1.4 (AS path: 4 2)
+FRR RIB           →  B>* 2.2.2.2/32 via 1.4.1.4, Ethernet0, rmapsrc 1.1.1.1
+Linux kernel      →  2.2.2.2 via 1.4.1.4 dev Ethernet0 proto bgp src 1.1.1.1
+ARP table         →  1.4.1.4 → MAC 78:61:32:bf:bc:00
+APP_DB ROUTE      →  nexthop 1.4.1.4, ifname Ethernet0
+APP_DB NEIGH      →  78:61:32:bf:bc:00
+ASIC_DB ROUTE     →  nexthop OID 0x400000000097e
+ASIC_DB NEXT_HOP  →  IP 1.4.1.4, rif OID 0x600000000096b
+ASIC_DB NEIGHBOR  →  dst-MAC 78:61:32:BF:BC:00
+NPU route-table   →  2.2.2.2/32 → next-hop, MAC 78:61:32:bf:bc:00
+NPU prefix        →  OID 10489 → NORMAL → Ethernet0
+ASIC forwards     →  Rewrite dst-MAC to 78:61:32:bf:bc:00, egress Ethernet0
+```
+
+If any layer in this chain is missing, packets will be dropped. Common failures:
+- Route in BGP RIB but not in FRR FIB → nexthop not resolvable (no connected route to the nexthop subnet)
+- Route in FIB but ARP `INCOMPLETE` → L2 adjacency broken (interface down, wrong VLAN, MTU mismatch)
+- Route in kernel but not in APP_DB → `fpmsyncd` issue (check `systemctl status bgp`)
+- Route in APP_DB but not in ASIC_DB → `orchagent` failed to translate to SAI objects (check `show services` and syslog for `orchagent` errors)
+- Route in ASIC_DB but not in NPU route-table → SAI SDK failed to program hardware (vendor ASIC issue)
+
+---
+
+### 4.8 Loopback Reachability (Ping Tests)
+
+`ttl=63` confirms single-hop transit through Spine4. `ttl=64` confirms direct adjacency (leaf → spine).
+
+**From Leaf1:**
+
+```bash
+ping 2.2.2.2 -c3 -I 1.1.1.1
+```
+
+```
+PING 2.2.2.2 (2.2.2.2) from 1.1.1.1 : 56(84) bytes of data.
+64 bytes from 2.2.2.2: icmp_seq=1 ttl=63 time=171 ms
+64 bytes from 2.2.2.2: icmp_seq=2 ttl=63 time=299 ms
+64 bytes from 2.2.2.2: icmp_seq=3 ttl=63 time=596 ms
+
+--- 2.2.2.2 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+```
+
+```bash
+ping 3.3.3.3 -c3 -I 1.1.1.1
+```
+
+```
+PING 3.3.3.3 (3.3.3.3) from 1.1.1.1 : 56(84) bytes of data.
+64 bytes from 3.3.3.3: icmp_seq=1 ttl=63 time=55.6 ms
+64 bytes from 3.3.3.3: icmp_seq=2 ttl=63 time=179 ms
+64 bytes from 3.3.3.3: icmp_seq=3 ttl=63 time=218 ms
+
+--- 3.3.3.3 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+```
+
+```bash
+ping 4.4.4.4 -c3 -I 1.1.1.1
+```
+
+```
+PING 4.4.4.4 (4.4.4.4) from 1.1.1.1 : 56(84) bytes of data.
+64 bytes from 4.4.4.4: icmp_seq=1 ttl=64 time=33.6 ms
+64 bytes from 4.4.4.4: icmp_seq=2 ttl=64 time=256 ms
+64 bytes from 4.4.4.4: icmp_seq=3 ttl=64 time=230 ms
+
+--- 4.4.4.4 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+```
+
+**From Leaf2:**
+
+```bash
+ping 1.1.1.1 -c3 -I 2.2.2.2
+```
+
+```
+PING 1.1.1.1 (1.1.1.1) from 2.2.2.2 : 56(84) bytes of data.
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=63 time=421 ms
+64 bytes from 1.1.1.1: icmp_seq=2 ttl=63 time=371 ms
+64 bytes from 1.1.1.1: icmp_seq=3 ttl=63 time=234 ms
+
+--- 1.1.1.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+```
+
+```bash
+ping 3.3.3.3 -c3 -I 2.2.2.2
+```
+
+```
+PING 3.3.3.3 (3.3.3.3) from 2.2.2.2 : 56(84) bytes of data.
+64 bytes from 3.3.3.3: icmp_seq=1 ttl=63 time=18.1 ms
+64 bytes from 3.3.3.3: icmp_seq=2 ttl=63 time=193 ms
+64 bytes from 3.3.3.3: icmp_seq=3 ttl=63 time=91.8 ms
+
+--- 3.3.3.3 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+```
+
+```bash
+ping 4.4.4.4 -c3 -I 2.2.2.2
+```
+
+```
+PING 4.4.4.4 (4.4.4.4) from 2.2.2.2 : 56(84) bytes of data.
+64 bytes from 4.4.4.4: icmp_seq=1 ttl=64 time=228 ms
+64 bytes from 4.4.4.4: icmp_seq=2 ttl=64 time=439 ms
+64 bytes from 4.4.4.4: icmp_seq=3 ttl=64 time=108 ms
+
+--- 4.4.4.4 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+```
+
+All pings succeed with 0% packet loss. The underlay is healthy and ready for VXLAN overlay configuration.
+
+---
+
+## BGP Logging & Debug
+
+FRR's `debug bgp` commands produce real-time diagnostic output. All categories can be scoped to a specific prefix (e.g., `debug bgp updates prefix 2.2.2.2/32`) or direction (`in`/`out`). Always disable debug when done — it is very verbose and will fill disk.
+
+### Debug Categories
+
+| Category | What it logs | When to use |
+|----------|-------------|-------------|
+| `neighbor-events` | Session state transitions (Idle → Connect → OpenSent → Established), hold-timer expirations, TCP resets | Session flapping or failing to establish |
+| `updates` | Every UPDATE message — prefixes, path attributes, next-hops, withdrawals | Missing or unexpected routes |
+| `keepalives` | Every KEEPALIVE exchanged with peers | Diagnosing hold-timer expiry / session drops |
+| `bestpath` | Path selection decisions — why a route was chosen or rejected | Route not being selected as expected |
+| `zebra` | Route installs/withdrawals between BGP and the kernel RIB | Route in BGP RIB but not in `show ip route` |
+| `nht` | Next-hop tracking — reachability changes for BGP next-hops | Next-hop marked unreachable despite connected subnet being present |
+
+### Log Destinations
+
+FRR supports multiple log destinations, configured inside `vtysh` under `configure terminal`. You can enable more than one simultaneously.
+
+| Destination | Command | Where output goes | Notes |
+|-------------|---------|-------------------|-------|
+| File | `log file /var/log/frr/frr.log` | File inside the BGP container | Most common for debug. Read with `docker exec bgp tail ...` |
+| Syslog | `log syslog debugging` | Container rsyslog → host `/var/log/syslog` | Integrates with SONiC's centralized logging pipeline |
+| Stdout | `log stdout` | Container stdout (captured by Docker) | Visible via `docker logs bgp` |
+| Monitor | `terminal monitor` (inside vtysh) | Current vtysh session only | Real-time view; stops when you exit vtysh |
+
+Use `show logging` inside vtysh to see which destinations are currently active.
+
+### Worked Example — Watching a Session Reset
+
+> **Goal:** Enable neighbor-event and inbound-update logging, reset the BGP session to Spine4, and observe the session come back up and re-learn all routes.
+
+**1. Enable file logging and debug (inside `vtysh`):**
+
+```
+configure terminal
+log file /var/log/frr/frr.log
+log timestamp precision 3
+exit
+
+debug bgp neighbor-events
+debug bgp updates in
+```
+
+**2. Verify debug is active:**
+
+```
+show debugging
+```
+
+```
+BGP debugging status:
+  BGP neighbor-events debugging is on
+  BGP updates debugging is on (inbound)
+```
+
+**3. Trigger a BGP reset and wait a few seconds:**
+
+```bash
+vtysh -c 'clear bgp ipv4 unicast 1.4.1.4'
+```
+
+**4. Read the log** (the log file lives inside the BGP container):
+
+```bash
+docker exec bgp tail -30 /var/log/frr/frr.log
+```
+
+**Leaf1** output (trimmed to key lines):
+```
+2026/04/20 03:11:14.136 BGP: 1.4.1.4 [FSM] Receive_OPEN_message (OpenSent->OpenConfirm), fd 23
+2026/04/20 03:11:14.136 BGP: 1.4.1.4 received hostname pod12-spine4, domainname (null)
+2026/04/20 03:11:14.210 BGP: 1.4.1.4 [FSM] Receive_KEEPALIVE_message (OpenConfirm->Established), fd 23
+2026/04/20 03:11:14.211 BGP: 1.4.1.4 fd 23 went from OpenConfirm to Established
+2026/04/20 03:11:15.311 BGP: send End-of-RIB for IPv4 Unicast to 1.4.1.4
+2026/04/20 03:11:15.797 BGP: 1.4.1.4(pod12-spine4) rcvd UPDATE w/ attr: nexthop 1.4.1.4, origin ?, path 4 2
+2026/04/20 03:11:15.797 BGP: 1.4.1.4(pod12-spine4) rcvd 2.2.2.2/32 IPv4 unicast
+2026/04/20 03:11:15.797 BGP: 1.4.1.4(pod12-spine4) rcvd UPDATE w/ attr: nexthop 1.4.1.4, origin ?, path 4 3
+2026/04/20 03:11:15.797 BGP: 1.4.1.4(pod12-spine4) rcvd 3.3.3.3/32 IPv4 unicast
+2026/04/20 03:11:15.797 BGP: 1.4.1.4(pod12-spine4) rcvd UPDATE w/ attr: nexthop 1.4.1.4, origin ?, metric 0, path 4
+2026/04/20 03:11:15.797 BGP: 1.4.1.4(pod12-spine4) rcvd 4.4.4.4/32 IPv4 unicast
+2026/04/20 03:11:15.797 BGP: 1.4.1.4(pod12-spine4) rcvd UPDATE about 1.1.1.1/32 IPv4 unicast -- DENIED due to: as-path contains our own AS;
+2026/04/20 03:11:15.797 BGP: bgp_update_receive: rcvd End-of-RIB for IPv4 Unicast from 1.4.1.4 in vrf default
+```
+
+Reading through the log:
+- **03:11:14** — The session transitions OpenSent → OpenConfirm → Established within ~75ms.
+- **03:11:15** — Leaf1 sends its own End-of-RIB, then Spine4 sends all its routes.
+- Each `rcvd UPDATE` line shows the prefix, next-hop, and AS path — you can see `2.2.2.2/32` arrives with path `4 2` (via Spine4 from Leaf2's AS).
+- The update for `1.1.1.1/32` is **DENIED** because the AS path contains Leaf1's own AS (loop prevention).
+- The session ends with End-of-RIB from Spine4, confirming the initial table exchange is complete.
+
+**5. Disable debug when done:**
+
+```bash
+vtysh -c 'no debug bgp'
+```
+
+---
+
+## Quick Reference — Verification Command Summary
+
+| Command | What it shows |
+|---------|---------------|
+| `show ip interfaces` | Interface IPs and admin/oper state |
+| `vtysh -c 'show running-config'` | Full FRR configuration |
+| `vtysh -c 'show bgp ipv4 unicast summary'` | BGP session state and prefix counts |
+| `vtysh -c 'show bgp ipv4 unicast'` | Full BGP RIB with paths and attributes |
+| `vtysh -c 'show bgp neighbors <IP>'` | Session details, capabilities, timers, counters |
+| `vtysh -c 'show route-map'` | Route-map match/set clauses and invocation counts |
+| `vtysh -c 'show ip route'` | FRR RIB with route source codes |
+| `ip route show proto bgp` | Linux kernel BGP routes |
+| `ip neigh show dev <intf>` | ARP/neighbor table for nexthop MAC resolution |
+| `sonic-db-cli APPL_DB keys 'ROUTE_TABLE:*'` | All routes in SONiC APP_DB |
+| `sonic-db-cli APPL_DB hgetall 'ROUTE_TABLE:<prefix>'` | Nexthop and interface for a specific route |
+| `sonic-db-cli APPL_DB hgetall 'NEIGH_TABLE:<intf>:<ip>'` | Neighbor MAC in APP_DB |
+| `sonic-db-cli ASIC_DB keys 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:*'` | All route SAI objects written by orchagent |
+| `sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{...}'` | Nexthop OID for a specific route in ASIC_DB |
+| `sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_NEXT_HOP:<oid>'` | Nexthop IP and router interface OID |
+| `sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:{...}'` | Destination MAC for a neighbor in ASIC_DB |
+| `sudo show platform npu router route-table` | All prefixes programmed in the ASIC |
+| `sudo show platform npu router prefix -ip <prefix>` | ASIC prefix → nexthop OID → MAC → egress port |
+| `sudo show platform npu next-hop entries` | All ASIC nexthop entries with MACs and ref-counts |
+| `ping <IP> -c3 -I <loopback>` | End-to-end loopback reachability |
+| `vtysh -c 'show debugging'` | Active debug flags |
