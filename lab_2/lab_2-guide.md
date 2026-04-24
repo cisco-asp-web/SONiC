@@ -15,6 +15,8 @@ We use FRR (Free Range Routing) as the routing stack on SONiC to build a fully f
 - [Step 2 — Interface IPs](#step-2--interface-ips)
 - [Step 3 — Underlay BGP Configuration](#step-3--underlay-bgp-configuration)
 - [Step 4 — Extensive Verification](#step-4--extensive-verification)
+- [Step 5 — Configuration Persistence](#step-5--configuration-persistence)
+- [Step 6 — Dynamic Prefix Advertisement](#step-6--dynamic-prefix-advertisement)
 - [BGP Logging & Debug](#bgp-logging--debug)
 
 ## Lab Objectives
@@ -1030,6 +1032,62 @@ PING 4.4.4.4 (4.4.4.4) from 2.2.2.2 : 56(84) bytes of data.
 ```
 
 All pings succeed with 0% packet loss. The underlay is healthy and ready for VXLAN overlay configuration.
+
+---
+
+## Step 5 — Configuration Persistence
+
+In `split-unified` mode, SONiC's `config_db.json` and FRR's `bgpd.conf` are maintained separately. The IP addresses you configured earlier via `config interface ip add` were saved to `config_db.json` when you ran `sudo config save -y`. However, the BGP configuration entered via `vtysh` is currently only in the *running configuration*. If you reboot the switch now, the BGP configuration will be lost!
+
+Run this on all devices to save the routing configuration:
+```bash
+vtysh -c 'write memory'
+```
+*(Alternatively, you can use `copy running-config startup-config` inside vtysh)*
+
+Verify that the FRR configuration has been written to the file system. Check the configuration on **Leaf1**:
+```bash
+sudo cat /etc/sonic/frr/bgpd.conf
+```
+You should see the BGP router configuration, prefix-lists, and route-maps persisted here. This ensures FRR restores the BGP adjacencies upon a device reboot.
+
+---
+
+## Step 6 — Dynamic Prefix Advertisement
+
+To test how dynamic updates propagate through the fabric and reinforce how FRR prefix-lists act as policy filters, let's create a new loopback interface on Leaf1 and advertise it to the rest of the fabric.
+
+**1. Create a new loopback on Leaf1:**
+```bash
+sudo config interface ip add Loopback1 11.11.11.11/32
+```
+
+**2. Observe BGP on Spine4:**
+Check if Spine4 has learned the new loopback:
+```bash
+vtysh -c 'show bgp ipv4 unicast 11.11.11.11/32'
+```
+*It should output `% Network not in table`!* Why? Because we have an explicit route-map (`ADVERTISE`) on Leaf1 that only permits prefixes matching the `LOOPBACKS` prefix-list, which currently only contains `1.1.1.1/32`. Although the route is redistributed via `redistribute connected`, it is blocked outbound.
+
+**3. Update Leaf1's Prefix-List:**
+On Leaf1, enter `vtysh` and add the new loopback to the prefix-list:
+```bash
+vtysh -c 'configure terminal' -c 'ip prefix-list LOOPBACKS seq 10 permit 11.11.11.11/32'
+```
+
+**4. Verify Propagation:**
+Now check Spine4 again:
+```bash
+vtysh -c 'show bgp ipv4 unicast 11.11.11.11/32'
+```
+The route should now be present and will be propagated to Leaf2 and Leaf3. You can verify reachability by pinging `11.11.11.11` from Leaf2 or Leaf3.
+
+**5. Clean Up:**
+Remove the loopback and prefix-list entry:
+```bash
+sudo config interface ip remove Loopback1 11.11.11.11/32
+vtysh -c 'configure terminal' -c 'no ip prefix-list LOOPBACKS seq 10'
+```
 
 ---
 
