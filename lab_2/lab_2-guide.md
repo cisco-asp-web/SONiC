@@ -1044,6 +1044,8 @@ admin@pod9-leaf1:~$ sonic-db-cli COUNTERS_DB hgetall COUNTERS_PORT_NAME_MAP | \
 Ethernet0
 ```
 
+The next NPU verification gives a much simpler way to trace the next hop and the outgoing interface.
+
 #### ASIC / NPU Verification (show platform npu)
 
 These commands query the hardware ASIC directly. If a route is in APP_DB but not in the NPU route table, `orchagent` failed to program it.
@@ -1254,7 +1256,17 @@ All pings succeed with 0% packet loss. The underlay is healthy and ready for VXL
 
 ## Step 5 — Configuration Persistence
 
-In `split-unified` mode, SONiC's `config_db.json` and FRR's `bgpd.conf` are maintained separately. The IP addresses you configured earlier via `config interface ip add` were saved to `config_db.json` when you ran `sudo config save -y`. However, the BGP configuration entered via `vtysh` is currently only in the *running configuration*. If you reboot the switch now, the BGP configuration will be lost!
+Remember that in `split-unified` mode, SONiC maintains two separate configuration stores that must both
+be saved independently:
+
+| What                            | Where                                          | How to save             |
+|---------------------------------|------------------------------------------------|-------------------------|
+| Interface IPs, VLANs, ports …   | `/etc/sonic/config_db.json` (host)             | `sudo config save -y`   |
+| BGP, route-maps, prefix-lists … | `/etc/frr/frr.conf` (inside `bgp` container) | `vtysh -c 'write memory'` |
+
+The IP addresses configured earlier via `config interface ip add` were already persisted to `config_db.json` when you ran `sudo config save -y`. However, the BGP configuration entered via `vtysh` is currently **only in the running configuration**. 
+If you reboot the switch now, the BGP configuration will be lost.
+
 
 Run this on all devices to save the routing configuration:
 ```bash
@@ -1262,12 +1274,34 @@ vtysh -c 'write memory'
 ```
 *(Alternatively, you can use `copy running-config startup-config` inside vtysh)*
 
-Verify that the FRR configuration has been written to the file system. Check the configuration on **Leaf1**:
-```bash
-sudo cat /etc/sonic/frr/bgpd.conf
-```
-You should see the BGP router configuration, prefix-lists, and route-maps persisted here. This ensures FRR restores the BGP adjacencies upon a device reboot.
+### Verifying the Saved Configuration
 
+To verify the configuration was written to disk, you need to read the file **from inside the
+`bgp` container** — not from the host shell. This is one of the most common mistakes students
+make, so it is worth understanding why:
+
+> SONiC runs every daemon inside its own isolated Docker container with its own filesystem.
+> FRR is not installed on the host — it lives entirely inside the `bgp` container. The path
+> `/etc/frr/` does not exist on the host filesystem at all.
+
+```bash
+docker exec bgp cat /etc/frr/frr.conf
+```
+
+⚠️ **Warning:** if you do a `sudo cat /etc/frr/frr.conf` from the linux host (device itself) it will return an error as frr.conf does NOT exist on the linux host but within the bgp container as explained previously
+
+Check the configuration on **Leaf1**:
+
+```bash
+docker exec bgp cat /etc/frr/frr.conf
+```
+
+You should see your full FRR running configuration persisted — BGP router config, prefix-lists, route-maps, and `RM_SET_SRC`.
+ This confirms FRR will restore all BGPadjacencies upon a device reboot.
+
+> 💡 The presence of `service integrated-vtysh-config` at the top of `frr.conf` confirms 
+> that `split-unified` mode is active inside FRR and that a single file is managing all
+> daemon configuration.
 ---
 
 ## Step 6 — Dynamic Prefix Advertisement
