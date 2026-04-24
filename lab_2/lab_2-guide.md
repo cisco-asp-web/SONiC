@@ -1516,7 +1516,9 @@ Reading through the log:
 vtysh -c 'no debug bgp'
 ```
 
----
+
+Proceed to [**Lab 3 (SONiC Automation on Cisco 8000)**](../lab_3/lab_3-guide.md) to understand how we can automate SONiC.
+Also, if you have the time or want to revisit later, you can do [**Lab 2 (additional lab - Tracking a Route Through the Entire SONiC Pipeline)**](../lab_2/lab_2-tracking-guide.md)
 
 ## Quick Reference — Verification Command Summary
 
@@ -1543,3 +1545,4 @@ vtysh -c 'no debug bgp'
 | `sudo show platform npu next-hop entries`                                            | All ASIC nexthop entries with MACs and ref-counts  |
 | `ping <IP> -c3 -I <loopback>`                                                        | End-to-end loopback reachability                   |
 | `vtysh -c 'show debugging'`                                                          | Active debug flags                                 |
+
