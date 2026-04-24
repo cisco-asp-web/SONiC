@@ -820,6 +820,9 @@ lo                     127.0.0.1/16         up/up         N/A             N/A
 
 Ethernet0 shows `1.4.1.1/24` with `up/up` status. The `eth0` and `eth4` interfaces are management — do not modify them.
 
+> **Note:** The neighbor host already has LACP preconfigured so the interface becomes active
+>
+
 **Linux view** — SONiC programs the Linux kernel. You can see the same IP with standard `ip` commands:
 
 ```bash
