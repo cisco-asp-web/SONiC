@@ -329,14 +329,12 @@ show ip interfaces
 ping 1.4.1.1 -c 3   # Leaf1 via Ethernet0
 ping 2.4.1.2 -c 3   # Leaf2 via Ethernet4
 ping 3.4.1.3 -c 3   # Leaf3 via Ethernet8
+
 ```
 
 > ⚠️ **Do not proceed to Step 3 until all three pings succeed.** A BGP session will never establish over a broken underlay. If a ping fails, check `show interfaces status` on both ends and verify the IP assignment with `show ip interfaces`.
 
 > 💡 **Why neighbor IPs and not loopbacks?** At this stage only the directly connected `/24` subnets exist in the routing table. Loopback addresses (`1.1.1.1/32`, `2.2.2.2/32`, `3.3.3.3/32`) are not reachable until BGP is up and advertising them. A successful ping to each neighbor IP is sufficient to confirm the link is up, the IP is correctly assigned on both ends, and the ASIC is forwarding.
-
-
-
 
 ---
 
@@ -346,7 +344,8 @@ ping 3.4.1.3 -c 3   # Leaf3 via Ethernet8
 > - **`bgp ebgp-requires-policy`** is enabled by default in FRR. Every eBGP neighbor must have an explicit inbound and outbound route-map applied, or no routes will be exchanged. This is why `route-map PASS` is applied to all neighbors.
 > - **`no bgp default ipv4-unicast`** is set explicitly here. By default in FRR, all neighbors are automatically activated in the IPv4 unicast address-family. Disabling this ensures neighbors are only activated where explicitly configured.
 
-> Enter `vtysh` on each device before pasting.
+> [!NOTE]
+> Enter `vtysh` and `config terminal` on each device before pasting.
 
 **Leaf1:**
 
@@ -466,49 +465,66 @@ exit
 
 Confirms the full FRR config is applied as expected. Check router-id, AS number, peer-group membership, route-maps, and prefix-lists.
 
+From the SONiC CLI :
 ```bash
 vtysh -c 'show running-config'
 ```
 
-**Leaf1** output:
+or simply within the vtysh cli
+
+```bash
+show run
 ```
+
+**Spine4** output:
+```
+admin@pod9-spine4:~$ vtysh
+
+Hello, this is FRRouting (version 8.5.4).
+Copyright 1996-2005 Kunihiro Ishiguro, et al.
+
+pod9-spine4# show running-config
+Building configuration...
+
+Current configuration:
+!
 frr version 8.5.4
 frr defaults traditional
-hostname pod12-leaf1
+hostname pod9-spine4
 no zebra nexthop kernel enable
 fpm address 127.0.0.1
 no fpm use-next-hop-groups
 service integrated-vtysh-config
 !
-router bgp 1
- bgp router-id 1.1.1.1
+router bgp 4
+ bgp router-id 4.4.4.4
  no bgp default ipv4-unicast
- neighbor SPINE peer-group
- neighbor SPINE remote-as 4
- neighbor 1.4.1.4 peer-group SPINE
+ neighbor LEAF peer-group
+ neighbor 1.4.1.1 remote-as 1
+ neighbor 1.4.1.1 peer-group LEAF
+ neighbor 2.4.1.2 remote-as 2
+ neighbor 2.4.1.2 peer-group LEAF
+ neighbor 3.4.1.3 remote-as 3
+ neighbor 3.4.1.3 peer-group LEAF
  !
  address-family ipv4 unicast
   redistribute connected
-  neighbor SPINE activate
-  neighbor SPINE route-map PASS in
-  neighbor SPINE route-map ADVERTISE out
+  neighbor LEAF activate
+  neighbor LEAF route-map PASS in
+  neighbor LEAF route-map PASS out
  exit-address-family
 exit
 !
-ip prefix-list LOOPBACKS seq 5 permit 1.1.1.1/32
-!
 route-map RM_SET_SRC permit 10
- set src 1.1.1.1
+ set src 4.4.4.4
 exit
 !
 route-map PASS permit 10
 exit
 !
-route-map ADVERTISE permit 10
- match ip address prefix-list LOOPBACKS
-exit
-!
 ip protocol bgp route-map RM_SET_SRC
+!
+end
 ```
 
 ---
