@@ -1326,12 +1326,88 @@ On Leaf1, enter `vtysh` and add the new loopback to the prefix-list:
 vtysh -c 'configure terminal' -c 'ip prefix-list LOOPBACKS seq 10 permit 11.11.11.11/32'
 ```
 
+Expected output:
+
+```bash
+#Updating the prefix list:
+admin@pod9-leaf1:~$ vtysh -c 'configure terminal' -c 'ip prefix-list LOOPBACKS seq 10 permit 11.11.11.11/32'
+
+
+#Verification
+admin@pod9-leaf1:~$ sudo docker exec bgp vtysh -c 'show running-config'
+Building configuration...
+
+Current configuration:
+!
+frr version 8.5.4
+frr defaults traditional
+hostname pod9-leaf1
+no zebra nexthop kernel enable
+fpm address 127.0.0.1
+no fpm use-next-hop-groups
+service integrated-vtysh-config
+!
+ip route 172.30.0.0/16 172.16.1.254 tag 1
+!
+vrf VrfBlue
+ ip route 172.31.0.0/16 172.16.1.254 tag 1
+exit-vrf
+!
+router bgp 1
+ bgp router-id 1.1.1.1
+ no bgp default ipv4-unicast
+ neighbor SPINE peer-group
+ neighbor SPINE remote-as 4
+ neighbor 1.4.1.4 peer-group SPINE
+ !
+ address-family ipv4 unicast
+  redistribute connected
+  neighbor SPINE activate
+  neighbor SPINE route-map PASS in
+  neighbor SPINE route-map ADVERTISE out
+ exit-address-family
+exit
+!
+ip prefix-list LOOPBACKS seq 5 permit 1.1.1.1/32
+ip prefix-list LOOPBACKS seq 10 permit 11.11.11.11/32
+!
+route-map RM_SET_SRC permit 10
+ set src 1.1.1.1
+exit
+!
+route-map PASS permit 10
+exit
+!
+route-map ADVERTISE permit 10
+ match ip address prefix-list LOOPBACKS
+exit
+!
+ip protocol bgp route-map RM_SET_SRC
+!
+end
+```
+
 **4. Verify Propagation:**
 Now check Spine4 again:
 ```bash
 vtysh -c 'show bgp ipv4 unicast 11.11.11.11/32'
 ```
 The route should now be present and will be propagated to Leaf2 and Leaf3. You can verify reachability by pinging `11.11.11.11` from Leaf2 or Leaf3.
+
+Expected output:
+
+```bash
+admin@pod9-leaf2:~$ ping 11.11.11.11 -c3 -I 2.2.2.2
+PING 11.11.11.11 (11.11.11.11) from 2.2.2.2 : 56(84) bytes of data.
+64 bytes from 11.11.11.11: icmp_seq=1 ttl=63 time=263 ms
+64 bytes from 11.11.11.11: icmp_seq=2 ttl=63 time=184 ms
+64 bytes from 11.11.11.11: icmp_seq=3 ttl=63 time=186 ms
+
+--- 11.11.11.11 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2001ms
+rtt min/avg/max/mdev = 183.596/210.840/262.999/36.893 ms
+```
+
 
 **5. Clean Up:**
 Remove the loopback and prefix-list entry:
@@ -1348,25 +1424,25 @@ FRR's `debug bgp` commands produce real-time diagnostic output. All categories c
 
 ### Debug Categories
 
-| Category | What it logs | When to use |
-|----------|-------------|-------------|
-| `neighbor-events` | Session state transitions (Idle → Connect → OpenSent → Established), hold-timer expirations, TCP resets | Session flapping or failing to establish |
-| `updates` | Every UPDATE message — prefixes, path attributes, next-hops, withdrawals | Missing or unexpected routes |
-| `keepalives` | Every KEEPALIVE exchanged with peers | Diagnosing hold-timer expiry / session drops |
-| `bestpath` | Path selection decisions — why a route was chosen or rejected | Route not being selected as expected |
-| `zebra` | Route installs/withdrawals between BGP and the kernel RIB | Route in BGP RIB but not in `show ip route` |
-| `nht` | Next-hop tracking — reachability changes for BGP next-hops | Next-hop marked unreachable despite connected subnet being present |
+| Category          | What it logs                                                                                            |   When to use                                                      |
+|-------------------|---------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
+| `neighbor-events` | Session state transitions (Idle → Connect → OpenSent → Established), hold-timer expirations, TCP resets | Session flapping or failing to establish                           |
+| `updates`         | Every UPDATE message — prefixes, path attributes, next-hops, withdrawals                                | Missing or unexpected routes                                       |
+| `keepalives`      | Every KEEPALIVE exchanged with peers                                                                    | Diagnosing hold-timer expiry / session drops                       |
+| `bestpath`        | Path selection decisions — why a route was chosen or rejected                                           | Route not being selected as expected                               |
+| `zebra`           | Route installs/withdrawals between BGP and the kernel RIB                                               | Route in BGP RIB but not in `show ip route`                        |
+| `nht`             | Next-hop tracking — reachability changes for BGP next-hops                                              | Next-hop marked unreachable despite connected subnet being present |
 
 ### Log Destinations
 
 FRR supports multiple log destinations, configured inside `vtysh` under `configure terminal`. You can enable more than one simultaneously.
 
-| Destination | Command | Where output goes | Notes |
-|-------------|---------|-------------------|-------|
-| File | `log file /var/log/frr/frr.log` | File inside the BGP container | Most common for debug. Read with `docker exec bgp tail ...` |
-| Syslog | `log syslog debugging` | Container rsyslog → host `/var/log/syslog` | Integrates with SONiC's centralized logging pipeline |
-| Stdout | `log stdout` | Container stdout (captured by Docker) | Visible via `docker logs bgp` |
-| Monitor | `terminal monitor` (inside vtysh) | Current vtysh session only | Real-time view; stops when you exit vtysh |
+| Destination | Command                           | Where output goes                          | Notes                                                       |
+|-------------|-----------------------------------|--------------------------------------------|-------------------------------------------------------------|
+| File        | `log file /var/log/frr/frr.log`   | File inside the BGP container              | Most common for debug. Read with `docker exec bgp tail ...` |
+| Syslog      | `log syslog debugging`            | Container rsyslog → host `/var/log/syslog` | Integrates with SONiC's centralized logging pipeline        |
+| Stdout      | `log stdout`                      | Container stdout (captured by Docker)      | Visible via `docker logs bgp`                               |
+| Monitor     | `terminal monitor` (inside vtysh) | Current vtysh session only                 | Real-time view; stops when you exit vtysh                   |
 
 Use `show logging` inside vtysh to see which destinations are currently active.
 
@@ -1444,26 +1520,26 @@ vtysh -c 'no debug bgp'
 
 ## Quick Reference — Verification Command Summary
 
-| Command | What it shows |
-|---------|---------------|
-| `show ip interfaces` | Interface IPs and admin/oper state |
-| `vtysh -c 'show running-config'` | Full FRR configuration |
-| `vtysh -c 'show bgp ipv4 unicast summary'` | BGP session state and prefix counts |
-| `vtysh -c 'show bgp ipv4 unicast'` | Full BGP RIB with paths and attributes |
-| `vtysh -c 'show bgp neighbors <IP>'` | Session details, capabilities, timers, counters |
-| `vtysh -c 'show route-map'` | Route-map match/set clauses and invocation counts |
-| `vtysh -c 'show ip route'` | FRR RIB with route source codes |
-| `ip route show proto bgp` | Linux kernel BGP routes |
-| `ip neigh show dev <intf>` | ARP/neighbor table for nexthop MAC resolution |
-| `sonic-db-cli APPL_DB keys 'ROUTE_TABLE:*'` | All routes in SONiC APP_DB |
-| `sonic-db-cli APPL_DB hgetall 'ROUTE_TABLE:<prefix>'` | Nexthop and interface for a specific route |
-| `sonic-db-cli APPL_DB hgetall 'NEIGH_TABLE:<intf>:<ip>'` | Neighbor MAC in APP_DB |
-| `sonic-db-cli ASIC_DB keys 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:*'` | All route SAI objects written by orchagent |
-| `sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{...}'` | Nexthop OID for a specific route in ASIC_DB |
-| `sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_NEXT_HOP:<oid>'` | Nexthop IP and router interface OID |
-| `sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:{...}'` | Destination MAC for a neighbor in ASIC_DB |
-| `sudo show platform npu router route-table` | All prefixes programmed in the ASIC |
-| `sudo show platform npu router prefix -ip <prefix>` | ASIC prefix → nexthop OID → MAC → egress port |
-| `sudo show platform npu next-hop entries` | All ASIC nexthop entries with MACs and ref-counts |
-| `ping <IP> -c3 -I <loopback>` | End-to-end loopback reachability |
-| `vtysh -c 'show debugging'` | Active debug flags |
+| Command                                                                              | What it shows                                      |
+|--------------------------------------------------------------------------------------|----------------------------------------------------|
+| `show ip interfaces`                                                                 | Interface IPs and admin/oper state                 |
+| `vtysh -c 'show running-config'`                                                     | Full FRR configuration                             |
+| `vtysh -c 'show bgp ipv4 unicast summary'`                                           | BGP session state and prefix counts                |
+| `vtysh -c 'show bgp ipv4 unicast'`                                                   | Full BGP RIB with paths and attributes             |
+| `vtysh -c 'show bgp neighbors <IP>'`                                                 | Session details, capabilities, timers, counters    |
+| `vtysh -c 'show route-map'`                                                          | Route-map match/set clauses and invocation counts  |
+| `vtysh -c 'show ip route'`                                                           | FRR RIB with route source codes                    |
+| `ip route show proto bgp`                                                            | Linux kernel BGP routes                            |
+| `ip neigh show dev <intf>`                                                           | ARP/neighbor table for nexthop MAC resolution      |
+| `sonic-db-cli APPL_DB keys 'ROUTE_TABLE:*'`                                          | All routes in SONiC APP_DB                         |
+| `sonic-db-cli APPL_DB hgetall 'ROUTE_TABLE:<prefix>'`                                | Nexthop and interface for a specific route         |
+| `sonic-db-cli APPL_DB hgetall 'NEIGH_TABLE:<intf>:<ip>'`                             | Neighbor MAC in APP_DB                             |
+| `sonic-db-cli ASIC_DB keys 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:*'`               | All route SAI objects written by orchagent         |
+| `sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:{...}'`        | Nexthop OID for a specific route in ASIC_DB        |
+| `sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_NEXT_HOP:<oid>'`           | Nexthop IP and router interface OID                |
+| `sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_NEIGHBOR_ENTRY:{...}'`     | Destination MAC for a neighbor in ASIC_DB          |
+| `sudo show platform npu router route-table`                                          | All prefixes programmed in the ASIC                |
+| `sudo show platform npu router prefix -ip <prefix>`                                  | ASIC prefix → nexthop OID → MAC → egress port      |
+| `sudo show platform npu next-hop entries`                                            | All ASIC nexthop entries with MACs and ref-counts  |
+| `ping <IP> -c3 -I <loopback>`                                                        | End-to-end loopback reachability                   |
+| `vtysh -c 'show debugging'`                                                          | Active debug flags                                 |
