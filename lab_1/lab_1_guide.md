@@ -7,16 +7,11 @@
 
 This lab introduces the SONiC (Software for Open Networking in the Cloud) network operating system. You will explore the SONiC environment hands-on — login experience, software versioning, Docker-based architecture, platform hardware monitoring, and the three configuration methods (CLI, JSON, and FRR/vtysh). Then you will configure basic networking primitives. By the end of this lab you will have a solid foundation for subsequent labs that build eBGP underlay and VXLAN EVPN overlay fabrics.
 
-**SONiC version:** SONiC.202405cz.2.2.2 (Cisco 8000, FRR 8.5.4)
+**SONiC version used in this lab:** SONiC.202405cz.2.2.2 (Cisco 8000, FRR 8.5.4)
 
 ---
 
 ## Table of Contents
-
-- [Introduction to SONiC \& SONiC Configuration](#introduction-to-sonic--sonic-configuration)
-  - [Lab 1 — 3-Leaf / 1-Spine](#lab-1--3-leaf--1-spine)
-  - [Introduction](#introduction)
-  - [Table of Contents](#table-of-contents)
   - [Lab Objectives](#lab-objectives)
   - [Topology](#topology)
   - [Task 1 — SONiC Hello World](#task-1--sonic-hello-world)
