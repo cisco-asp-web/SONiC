@@ -25,12 +25,12 @@ This lab introduces the SONiC (Software for Open Networking in the Cloud) networ
       - [1.5.3 FRR (vtysh)](#153-frr-vtysh)
     - [1.6 Reboot Mechanisms](#16-reboot-mechanisms)
     - [1.7 vXR Emulation Brief](#17-vxr-emulation-brief)
-  - [Task 2 — Basic Configuration Circuit](#task-2--basic-configuration-circuit)
-    - [2.1 Configuring Users](#21-configuring-users)
-    - [2.2 - eth0 vs Ethernet0 in SONiC](#22---eth0-vs-ethernet0-in-sonic)
+    - [1.8 - eth0 vs Ethernet0 in SONiC](#18---eth0-vs-ethernet0-in-sonic)
       - [`eth0` vs `Ethernet0` in SONiC](#eth0-vs-ethernet0-in-sonic)
       - [`eth0` — Management Interface](#eth0--management-interface)
       - [`Ethernet0` — Data-Plane Front-Panel Port](#ethernet0--data-plane-front-panel-port)
+  - [Task 2 — Basic Configuration Circuit](#task-2--basic-configuration-circuit)
+    - [2.1 Configuring Users](#21-configuring-users)
   - [Side-by-Side Comparison](#side-by-side-comparison)
     - [2.2 Configuring Interface IPv4](#22-configuring-interface-ipv4)
     - [2.3 Configuring Loopback Interface](#23-configuring-loopback-interface)
@@ -670,44 +670,7 @@ Topology orchestration options:
 
 > \* **Note:**: containerlab can also support sonic-vs kvm images with the help of a conversion tool called vrnetlab. If interested ask instructors for details.
 
----
-
-## Task 2 — Basic Configuration Circuit
-
-> **Goal:** Configure fundamental device settings on Leaf1 — users, interface IPs, loopback addresses, VLANs, PortChannels, VRFs, and more.
->
-> All commands in Task 2 are run on **Leaf1** only.
-
----
-
-### 2.1 Configuring Users
-
-SONiC uses standard Linux user management. The default user is `admin`.
-
-**Run:**
-
-```bash
-sudo useradd -m -s /bin/bash labuser
-sudo passwd labuser
-```
-
-To add the user to the sudo group:
-
-**Run:**
-
-```bash
-sudo usermod -aG sudo labuser
-```
-
-**Verify:**
-
-```bash
-cat /etc/passwd | grep labuser
-```
-
---- 
-
-### 2.2 - eth0 vs Ethernet0 in SONiC
+### 1.8 - eth0 vs Ethernet0 in SONiC
 
 #### `eth0` vs `Ethernet0` in SONiC
 
@@ -774,6 +737,43 @@ admin@pod9-leaf1:~$ ip addr show Ethernet0
     inet6 fe80::7abd:24ff:fef3:b000/64 scope link
        valid_lft forever preferred_lft forever
 ```
+
+
+## Task 2 — Basic Configuration Circuit
+
+> **Goal:** Configure fundamental device settings on Leaf1 — users, interface IPs, loopback addresses, VLANs, PortChannels, VRFs, and more.
+>
+> All commands in Task 2 are run on **Leaf1** only.
+
+---
+
+### 2.1 Configuring Users
+
+SONiC uses standard Linux user management. The default user is `admin`.
+
+**Run:**
+
+```bash
+sudo useradd -m -s /bin/bash labuser
+sudo passwd labuser
+```
+
+To add the user to the sudo group:
+
+**Run:**
+
+```bash
+sudo usermod -aG sudo labuser
+```
+
+**Verify:**
+
+```bash
+cat /etc/passwd | grep labuser
+```
+
+--- 
+
 
 ---
 
