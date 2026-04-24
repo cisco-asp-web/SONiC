@@ -35,9 +35,7 @@ We will have achieved the following objectives upon completion of Lab 2:
 
 ## Topology
 
-
-![drawings/topology-base-view.png](../drawings/topology-bgp-view.png)
-
+<img src="../drawings/topology-bgp-view.png" width="800" />
 
 ## Introduction to SONiC BGP and FRR
 
