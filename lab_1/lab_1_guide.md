@@ -1013,7 +1013,7 @@ sudo config interface ip remove <interface> <ip/mask>
 
 ### 2.6 PortChannel (LACP)
 
-A PortChannel bundles multiple physical links into a single logical interface using LACP. In the EVPN lab, PortChannels are also used for multihoming with a shared ESI.
+A PortChannel bundles multiple physical links into a single logical interface using LACP. In the EVPN lab, PortChannels are also used for multihoming with a shared Ethernet Segment Identifier (ESI).
 
 **Run:**
 
@@ -1039,7 +1039,8 @@ Flags: A - active, I - inactive, Up - up, Dw - Down, N/A - not available,
 `LACP(A)(Up)` — LACP is active and the bundle is up. `(S)` on the member means it is selected and forwarding.
 
 **Linux view** — The PortChannel appears as a team/bond device, and the member shows its master:
-
+> **Note:** The neighbor host already has LACP preconfigured so the interface becomes active
+> 
 ```bash
 ip link show PortChannel1
 ```
