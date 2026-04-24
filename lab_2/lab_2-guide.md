@@ -939,17 +939,26 @@ This matches the ARP entry from `ip neigh show`.
 
 #### SONiC ASIC_DB (SAI Object Store)
 
-> **Where does ASIC_DB fit?** `orchagent` reads from APP_DB, translates routes/neighbors into SAI (Switch Abstraction Interface) objects, and writes them to ASIC_DB. The SAI SDK then programs the actual hardware. ASIC_DB is therefore the *canonical record* of what `orchagent` asked the ASIC to do — if a route is in APP_DB but missing from ASIC_DB, `orchagent` failed to process it.
+> **Where does ASIC_DB fit?**
+> Think of it as a paper trail. `orchagent` takes routes from APP_DB, converts them into
+> hardware instructions, writes them to ASIC_DB, and the SAI SDK programs the ASIC.
 >
-> The `show platform npu` commands (next section) read back from the hardware directly. ASIC_DB shows you what was *requested*; the NPU CLI shows you what was *programmed*.
+> - **APP_DB** → what FRR wants the hardware to do
+> - **ASIC_DB** → what `orchagent` asked the ASIC to do
+> - **`show platform npu`** → what the ASIC actually did
+>
+> A route in APP_DB but missing from ASIC_DB means `orchagent` failed. A route in ASIC_DB
+> but not forwarding means the SAI/hardware layer failed. That distinction tells you exactly
+> where to look when things break.
+
 
 ASIC_DB keys are SAI object types with JSON-encoded key fields. The main ones for route verification are:
 
-| SAI Object Type | What it stores |
-|-----------------|----------------|
-| `SAI_OBJECT_TYPE_ROUTE_ENTRY` | Prefix → nexthop OID mapping |
-| `SAI_OBJECT_TYPE_NEXT_HOP` | Nexthop IP + router interface OID |
-| `SAI_OBJECT_TYPE_NEIGHBOR_ENTRY` | Neighbor IP → destination MAC |
+| SAI Object Type                    | What it stores                        |
+|------------------------------------|---------------------------------------|
+| `SAI_OBJECT_TYPE_ROUTE_ENTRY`      | Prefix → nexthop OID mapping          |
+| `SAI_OBJECT_TYPE_NEXT_HOP`         | Nexthop IP + router interface OID     |
+| `SAI_OBJECT_TYPE_NEIGHBOR_ENTRY`   | Neighbor IP → destination MAC         |
 | `SAI_OBJECT_TYPE_ROUTER_INTERFACE` | Interface → port OID, source MAC, MTU |
 
 ##### List all route entries
@@ -1012,7 +1021,8 @@ sonic-db-cli ASIC_DB hgetall 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTER_INTERFACE:oid:0x
 {'SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID': 'oid:0x3000000000042', 'SAI_ROUTER_INTERFACE_ATTR_SRC_MAC_ADDRESS': '78:EC:2B:CF:A8:00', 'SAI_ROUTER_INTERFACE_ATTR_TYPE': 'SAI_ROUTER_INTERFACE_TYPE_PORT', 'SAI_ROUTER_INTERFACE_ATTR_PORT_ID': 'oid:0x1000000000002', 'SAI_ROUTER_INTERFACE_ATTR_MTU': '9100'}
 ```
 
-The full ASIC_DB chain for `2.2.2.2/32`:
+The full ASIC_DB chain for `2.2.2.2/32`: (Route → Next-Hop OID → Router Interface OID → Port OID → Physical Interface)
+
 
 ```
 Route  →  nexthop OID 0x400000000097e
@@ -1022,6 +1032,17 @@ Route  →  nexthop OID 0x400000000097e
 ```
 
 > **Note:** All BGP-learned routes (`2.2.2.2/32`, `3.3.3.3/32`, `4.4.4.4/32`, etc.) point to the same nexthop OID `0x400000000097e` because they all resolve via the single nexthop `1.4.1.4` on Ethernet0.
+
+🔥 **Bonus:** To find the name of the outgoing interface, here is a little python script. Ethernet0 (not eth0 :)) is the outgoing interface.
+
+```bash
+admin@pod9-leaf1:~$ sonic-db-cli COUNTERS_DB hgetall COUNTERS_PORT_NAME_MAP | \
+> python3 -c "import sys,ast; d=ast.literal_eval(sys.stdin.read()); \
+> print({v:k for k,v in d.items()}.get('oid:0x1000000000002','not found'))"
+
+
+Ethernet0
+```
 
 #### ASIC / NPU Verification (show platform npu)
 
