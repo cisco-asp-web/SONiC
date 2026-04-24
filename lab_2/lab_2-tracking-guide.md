@@ -27,7 +27,7 @@ watch -n 1 "sonic-db-cli CONFIG_DB hgetall 'INTERFACE|Loopback1'"
 
 **Terminal 2 — Leaf1: APP_DB**
 ```bash
-watch -n 1 "sonic-db-cli APP_DB hgetall 'ROUTE_TABLE:10.10.10.10/32'"
+watch -n 1 "sonic-db-cli APPL_DB hgetall 'ROUTE_TABLE:10.10.10.10/32'"
 ```
 
 **Terminal 3 — Leaf1: ASIC_DB**
