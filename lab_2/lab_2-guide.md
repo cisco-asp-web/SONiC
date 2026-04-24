@@ -314,6 +314,30 @@ lo                     127.0.0.1/16         up/up         N/A             N/A
 
 All lab interfaces must show `up/up` before proceeding.
 
+
+## Step 2 — Verification
+
+Before moving to BGP configuration, verify all three underlay links are operational from **Spine4**:
+
+```bash
+# Confirm interfaces and IPs are correctly assigned
+show ip interfaces
+```
+
+```bash
+# Ping each directly connected neighbor — not the loopbacks (unreachable until BGP is up)
+ping 1.4.1.1 -c 3   # Leaf1 via Ethernet0
+ping 2.4.1.2 -c 3   # Leaf2 via Ethernet4
+ping 3.4.1.3 -c 3   # Leaf3 via Ethernet8
+```
+
+> ⚠️ **Do not proceed to Step 3 until all three pings succeed.** A BGP session will never establish over a broken underlay. If a ping fails, check `show interfaces status` on both ends and verify the IP assignment with `show ip interfaces`.
+
+> 💡 **Why neighbor IPs and not loopbacks?** At this stage only the directly connected `/24` subnets exist in the routing table. Loopback addresses (`1.1.1.1/32`, `2.2.2.2/32`, `3.3.3.3/32`) are not reachable until BGP is up and advertising them. A successful ping to each neighbor IP is sufficient to confirm the link is up, the IP is correctly assigned on both ends, and the ASIC is forwarding.
+
+
+
+
 ---
 
 ## Step 3 — Underlay BGP Configuration
