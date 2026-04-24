@@ -192,19 +192,7 @@ The one thing to avoid is **mixing both approaches for the same object**. For ex
 | `configure terminal` | Enter global config mode (for temporary changes) |
 | `write memory` | Flush running config to `frr.conf` (not persistent in split-unified — see above) |
 
-#### Navigating `vtysh` — Quick Reference
 
-```
-pod9-leaf1#                         → EXEC mode  (show, ping, traceroute)
-pod9-leaf1# configure terminal
-pod9-leaf1(config)#                 → CONFIG mode (router bgp, interface …)
-pod9-leaf1(config-router)#          → BGP sub-mode
-pod9-leaf1(config)# exit            → back one level
-pod9-leaf1# end                     → back to EXEC from anywhere
-pod9-leaf1# exit                    → quit vtysh
-```
-
-> 💡 `Ctrl+Z` works just like on IOS — it drops you back to EXEC mode from anywhere in the config hierarchy.
 
 ### Verify FRR Container is Running
 
