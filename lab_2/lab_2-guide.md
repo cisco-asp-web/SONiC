@@ -134,12 +134,19 @@ sudo systemctl restart bgp
 ```
 
 
+### The `vtysh` Shell
 
+`vtysh` is FRR's unified command shell — a single CLI that multiplexes across all running FRR daemons (`bgpd`, `zebra`, `staticd`, etc.) over Unix sockets. Its syntax is deliberately IOS-like, so if you are coming from Cisco IOS or NX-OS you will feel at home immediately. 
 
+```bash
+# From the SONiC host shell (preferred in this lab)
+vtysh
 
-### The vtysh Shell
+# Alternatively, drop into the bgp container first (the linux way :) ) 
+docker exec -it bgp vtysh
+```
 
-`vtysh` is the FRR unified command shell. It provides a single CLI interface across all FRR daemons using IOS-like syntax. You run it as root and once inside vtysh you will see a prompt with the device hostname:
+Once inside, the prompt reflects the device hostname:
 
 ```
 admin@pod9-leaf1:~$ vtysh
@@ -150,19 +157,54 @@ Copyright 1996-2005 Kunihiro Ishiguro, et al.
 pod9-leaf1#
 ```
 
-Key vtysh commands:
+#### `vtysh` and SONiC's `split-unified` Mode — What You Need to Know
 
-| vtysh Command                    | Description                              |
-|----------------------------------|------------------------------------------|
-| `show running-config`            | Show the full FRR running configuration  |
-| `show bgp summary`               | Show BGP neighbor summary                |
-| `show bgp neighbors`             | Show detailed BGP neighbor information   |
-| `show bgp ipv4 unicast`          | Show BGP IPv4 RIB                        |
-| `show bgp ipv6 unicast`          | Show BGP IPv6 RIB                        |
-| `show ip route`                  | Show the full IPv4 routing table         |
-| `configure terminal`             | Enter global configuration mode          |
-| `copy running-config startup-config` | Save running config to `bgpd.conf`   |
-| `write memory`                   | Alias for save                           |
+As covered in the previous section, `bgpcfgd` owns part of `/etc/frr/frr.conf` and syncs it from `CONFIG_DB`. **But it only manages what the SONiC abstraction layer knows about.** This creates a clean division of responsibility that is important to understand before starting the lab:
+
+| Configuration | Who manages it | How to configure |
+|---|---|---|
+| Basic BGP neighbors, peer-groups | `bgpcfgd` ← `CONFIG_DB` | `config bgp` SONiC commands |
+| Route-maps, prefix-lists | FRR directly | `vtysh` + `write memory` |
+| Address-family activation | `bgpcfgd` ← `CONFIG_DB` | `config bgp` SONiC commands |
+| Redistribution, timers, advanced BGP | FRR directly | `vtysh` + `write memory` |
+
+In this lab, **all configuration is done via `vtysh`**. This is intentional — route-maps, prefix-lists, and the BGP policy constructs you will build are not abstracted by SONiC's config layer, so `vtysh` is the correct and only interface for them. `write memory` is valid and necessary here.
+
+The one thing to avoid is **mixing both approaches for the same object**. For example, if you create a BGP neighbor via `config bgp neighbor add`, then try to modify that same neighbor in `vtysh`, `bgpcfgd` may overwrite your change on its next sync cycle. Since this lab uses `vtysh` end-to-end, you will not hit this conflict.
+
+> 💡 **Rule of thumb:** if it is in `CONFIG_DB` because you put it there with a `config` command, manage it via `config` commands. If you built it in `vtysh`, manage it in `vtysh`. Don't cross the streams.
+
+
+#### Key `vtysh` Commands for This Lab
+
+| Command | What It Shows |
+|---|---|
+| `show running-config` | Full FRR config as seen by all daemons |
+| `show bgp summary` | BGP neighbor table — state, prefixes received, uptime |
+| `show bgp neighbors` | Detailed per-neighbor info: timers, capabilities, message counters |
+| `show bgp neighbors <ip> advertised-routes` | Prefixes this router is advertising to a specific peer |
+| `show bgp neighbors <ip> received-routes` | Prefixes received from a specific peer (pre-policy) |
+| `show bgp ipv4 unicast` | BGP IPv4 RIB — best-path selection, attributes |
+| `show bgp ipv6 unicast` | BGP IPv6 RIB |
+| `show ip route` | Full IPv4 FIB as seen by zebra (post-selection) |
+| `show ipv6 route` | Full IPv6 FIB |
+| `show interface <name>` | Interface state, counters, and IP as seen by FRR |
+| `configure terminal` | Enter global config mode (for temporary changes) |
+| `write memory` | Flush running config to `frr.conf` (not persistent in split-unified — see above) |
+
+#### Navigating `vtysh` — Quick Reference
+
+```
+pod9-leaf1#                         → EXEC mode  (show, ping, traceroute)
+pod9-leaf1# configure terminal
+pod9-leaf1(config)#                 → CONFIG mode (router bgp, interface …)
+pod9-leaf1(config-router)#          → BGP sub-mode
+pod9-leaf1(config)# exit            → back one level
+pod9-leaf1# end                     → back to EXEC from anywhere
+pod9-leaf1# exit                    → quit vtysh
+```
+
+> 💡 `Ctrl+Z` works just like on IOS — it drops you back to EXEC mode from anywhere in the config hierarchy.
 
 ### Verify FRR Container is Running
 
