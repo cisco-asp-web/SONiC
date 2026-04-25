@@ -154,7 +154,7 @@ Create `~/sonic-automation/vlan_cli.yml` with the following content:
       become: true
 ```
 > [!Note]
-> The syntax *`become: true`* instructs Ansible to execute the command with *sudo*
+> The syntax *`become: true`* instructs Ansible to execute the command with `sudo`
 
 **Run** — Execute the playbook:
 
@@ -204,11 +204,21 @@ show vlan brief
 
 ### 1.3 The `cisco.sonic` Ansible Collection
 
+> [!Ansible-Galaxy-Reference]
+> https://galaxy.ansible.com/ui/repo/published/cisco/sonic/
+
 The `cisco.sonic` collection provides purpose-built modules for SONiC that support structured error handling, conditional execution (`wait_for`), and atomic rollback (`all_or_none`).
 
 Since the VLANs are already configured from the previous playbook, we will use the collection to **verify** the existing configuration and **configure FRR routing** — tasks that highlight the collection's unique strengths.
 
-The `cisco.sonic` modules use `network_cli` (SSH-based CLI sessions), so we need to add connection variables to our inventory. Update `~/sonic-automation/inventory.yaml`:
+The `cisco.sonic` modules use `network_cli` (SSH-based CLI sessions), so we need to add connection variables to our inventory. Update `~/sonic-automation/inventory.yaml` and append these two lines at the end:
+
+```yaml
+    ansible_connection: network_cli
+    ansible_network_os: cisco.sonic.sonic
+```
+
+After editing `inventory.yaml` should look like:
 
 ```yaml
 leaf_switches:
@@ -354,6 +364,7 @@ EOF
 sudo config load /tmp/gnmi.json -y
 ```
 
+Expected output:
 ```
 Running command: /usr/local/bin/sonic-cfggen -j /tmp/gnmi.json --write-to-db
 ```
@@ -691,3 +702,5 @@ This lab is complete. You have:
 | OpenConfig | Multi-vendor environments | Vendor-neutral, config + state separation |
 
 Both Ansible and gNMI can be combined: use Ansible for orchestrating multi-device workflows and gNMI for granular, real-time device interactions.
+
+Proceed to [**Lab 4 (Cisco 8000 SONiC — L4 ACL & CoPP)**](../lab_4/lab_4-guide.md) where we'll construct ACLs and secure SONiC's control plane.
