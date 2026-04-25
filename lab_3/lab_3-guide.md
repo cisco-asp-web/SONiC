@@ -10,21 +10,28 @@ SONiC runs on Debian Linux and exposes multiple configuration interfaces: a Pyth
 
 ## Table of Contents
 
-1. [Lab Objectives](#lab-objectives)
-2. [Task 1 — Ansible Automation](#task-1--ansible-automation)
-   - [1.1 Ansible Inventory](#11-ansible-inventory)
-   - [1.2 SONiC CLI via ansible.builtin.shell](#12-sonic-cli-via-ansiblebuiltinshell)
-   - [1.3 The cisco.sonic Ansible Collection](#13-the-ciscosonicansible-collection)
-   - [1.4 Ansible Summary](#14-ansible-summary)
-3. [Task 2 — gNMI Automation](#task-2--gnmi-automation)
-   - [2.1 Enabling gNMI on SONiC](#21-enabling-gnmi-on-sonic)
-   - [2.2 gNMI Capabilities](#22-gnmi-capabilities)
-   - [2.3 SONiC DB GET — Querying CONFIG_DB Directly](#23-sonic-db-get--querying-config_db-directly)
-   - [2.4 SONiC Native YANG GET](#24-sonic-native-yang-get)
-   - [2.5 OpenConfig GET](#25-openconfig-get)
-   - [2.6 Comparing the Three gNMI Models](#26-comparing-the-three-gnmi-models)
-   - [2.7 gNMI SET — Making Configuration Changes](#27-gnmi-set--making-configuration-changes)
-4. [End of Lab](#end-of-lab)
+- [Lab 3 Guide: SONiC Automation on Cisco 8000 \[25 Min\]](#lab-3-guide-sonic-automation-on-cisco-8000-25-min)
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
+  - [Lab Objectives](#lab-objectives)
+  - [Lab Environment](#lab-environment)
+    - [Credentials](#credentials)
+    - [gNMI](#gnmi)
+  - [Task 1 — Ansible Automation](#task-1--ansible-automation)
+    - [1.1 Ansible Inventory](#11-ansible-inventory)
+    - [1.2 SONiC CLI via `ansible.builtin.shell`](#12-sonic-cli-via-ansiblebuiltinshell)
+    - [1.3 The `cisco.sonic` Ansible Collection](#13-the-ciscosonic-ansible-collection)
+      - [Key Features of `cisco.sonic`](#key-features-of-ciscosonic)
+    - [1.4 Ansible Summary](#14-ansible-summary)
+  - [Task 2 — gNMI Automation](#task-2--gnmi-automation)
+    - [2.1 Enabling gNMI on SONiC](#21-enabling-gnmi-on-sonic)
+    - [2.2 gNMI Capabilities](#22-gnmi-capabilities)
+    - [2.3 SONiC DB GET — Querying CONFIG\_DB Directly](#23-sonic-db-get--querying-config_db-directly)
+    - [2.4 SONiC Native YANG GET](#24-sonic-native-yang-get)
+    - [2.5 OpenConfig GET](#25-openconfig-get)
+    - [2.6 Comparing the Three gNMI Models](#26-comparing-the-three-gnmi-models)
+    - [2.7 gNMI SET — Making Configuration Changes](#27-gnmi-set--making-configuration-changes)
+  - [End of Lab](#end-of-lab)
 
 ---
 
@@ -146,6 +153,7 @@ Create `~/sonic-automation/vlan_cli.yml` with the following content:
       ansible.builtin.shell: config save -y
       become: true
 ```
+>[Note]: the syntax *`become: true`* instructs Ansible to execute the command with *sudo*
 
 **Run** — Execute the playbook:
 
