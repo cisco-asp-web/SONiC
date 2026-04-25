@@ -153,7 +153,8 @@ Create `~/sonic-automation/vlan_cli.yml` with the following content:
       ansible.builtin.shell: config save -y
       become: true
 ```
->[Note]: the syntax *`become: true`* instructs Ansible to execute the command with *sudo*
+> [!Note]
+> The syntax *`become: true`* instructs Ansible to execute the command with *sudo*
 
 **Run** — Execute the playbook:
 
@@ -180,6 +181,8 @@ leaf1    : ok=5    changed=5    unreachable=0    failed=0
 
 ```bash
 ssh leaf1
+```
+```bash
 show vlan brief
 ```
 
@@ -194,6 +197,7 @@ show vlan brief
 ```
 
 > **Pros:** Simple, familiar, no extra modules needed.
+
 > **Cons:** No idempotency — running the playbook again may produce errors if VLANs already exist. No structured error handling.
 
 ---
