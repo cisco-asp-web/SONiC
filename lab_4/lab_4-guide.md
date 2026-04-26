@@ -1,5 +1,11 @@
 # Cisco 8000 SONiC — L4 ACL & CoPP Lab Guide
 
+---
+
+## Introduction
+
+Lab 4 explores SONiC's ACL support and CoPP for securing the control plane. 
+
 > **Scope** · Cisco **8000** · SONiC · **Ingress ACL** (ICMP permit, TCP **dport 80** drop) · **CoPP** read-only verification
 
 **Hands-on** L4-aware **ingress ACL** configuration and **read-only CoPP** checks—structured for **training**, **acceptance testing**, and **operator runbooks**.
