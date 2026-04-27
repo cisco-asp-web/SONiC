@@ -1552,3 +1552,19 @@ Also, if you have the time or want to revisit later, you can do [**Lab 2 (additi
 | `ping <IP> -c3 -I <loopback>`                                                        | End-to-end loopback reachability                   |
 | `vtysh -c 'show debugging'`                                                          | Active debug flags                                 |
 
+
+---
+
+## End of Lab 2
+
+Lab 2 is complete. You have:
+
+* Configured the `split` routing configuration mode
+* Configure and verify SONiC interface IP addressing
+* Implement a two-tier eBGP leaf-spine fabric
+* Configure BGP neighbors, address families, and route-maps using `vtysh`
+* Verify BGP session state, learned prefixes, and routing table
+* Confirm end-to-end reachability across the fabric
+* Inspect BGP routing state in the SONiC Redis database
+
+Proceed to [**Lab 3 (Automation)**](../lab_3/lab_3_guide.md) to learn about automation capabilities for SONiC.
