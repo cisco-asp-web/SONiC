@@ -11,12 +11,12 @@ We use FRR (Free Range Routing) as the routing stack on SONiC to build a fully f
   - [The vtysh Shell](#the-vtysh-shell)
   - [Verify FRR Container is Running](#verify-frr-container-is-running)
 - [Device Addressing](#device-addressing)
-- [Step 1 — Configure Split-Unified Routing Mode](#step-1--configure-split-unified-routing-mode)
-- [Step 2 — Interface IPs](#step-2--interface-ips)
-- [Step 3 — Underlay BGP Configuration](#step-3--underlay-bgp-configuration)
-- [Step 4 — Extensive Verification](#step-4--extensive-verification)
-- [Step 5 — Configuration Persistence](#step-5--configuration-persistence)
-- [Step 6 — Dynamic Prefix Advertisement](#step-6--dynamic-prefix-advertisement)
+- [Task 1 — Configure Split-Unified Routing Mode](#task-1--configure-split-unified-routing-mode)
+- [Task 2 — Interface IPs](#task-2--interface-ips)
+- [Task 3 — Underlay BGP Configuration](#task-3--underlay-bgp-configuration)
+- [Task 4 — Extensive Verification](#task-4--extensive-verification)
+- [Task 5 — Configuration Persistence](#task-5--configuration-persistence)
+- [Task 6 — Dynamic Prefix Advertisement](#task-6--dynamic-prefix-advertisement)
 - [BGP Logging & Debug](#bgp-logging--debug)
 
 ## Lab Objectives
@@ -96,7 +96,7 @@ Throughout this lab you will use `vtysh` extensively to inspect BGP state, verif
 - Why manually editing `/etc/frr/frr.conf` directly is **not recommended** — `bgpcfgd` will overwrite it
 - Why `docker exec bgp cat /etc/frr/frr.conf` is a useful diagnostic: it shows the exact FRR config that `bgpcfgd` has generated from the database at that moment
 
-### Step 1 — SONiC mode
+### Task 1 — SONiC mode
 
 These commands are different ways to verify the mode (leaf1, leaf2, leaf3, spine4):  
 Please verify the mode on all nodes in the fabric:
@@ -259,7 +259,7 @@ zsocket                          EXITED    Apr 24 04:42 AM
 
 ---
 
-## Step 2 — Interface IPs
+## Task 2 — Interface IPs
 
 **Leaf1:**
 
@@ -315,7 +315,7 @@ lo                     127.0.0.1/16         up/up         N/A             N/A
 All lab interfaces must show `up/up` before proceeding.
 
 
-## Step 2 — Verification
+## Task 2 — Verification
 
 Before moving to BGP configuration, verify all three underlay links are operational from **Spine4**:
 
@@ -332,13 +332,13 @@ ping 3.4.1.3 -c 3   # Leaf3 via Ethernet8
 
 ```
 
-> ⚠️ **Do not proceed to Step 3 until all three pings succeed.** A BGP session will never establish over a broken underlay. If a ping fails, check `show interfaces status` on both ends and verify the IP assignment with `show ip interfaces`.
+> ⚠️ **Do not proceed to Task 3 until all three pings succeed.** A BGP session will never establish over a broken underlay. If a ping fails, check `show interfaces status` on both ends and verify the IP assignment with `show ip interfaces`.
 
 > 💡 **Why neighbor IPs and not loopbacks?** At this stage only the directly connected `/24` subnets exist in the routing table. Loopback addresses (`1.1.1.1/32`, `2.2.2.2/32`, `3.3.3.3/32`) are not reachable until BGP is up and advertising them. A successful ping to each neighbor IP is sufficient to confirm the link is up, the IP is correctly assigned on both ends, and the ASIC is forwarding.
 
 ---
 
-## Step 3 — Underlay BGP Configuration
+## Task 3 — Underlay BGP Configuration
 
 > **FRR defaults to be aware of:**
 > - **`bgp ebgp-requires-policy`** is enabled by default in FRR. Every eBGP neighbor must have an explicit inbound and outbound route-map applied, or no routes will be exchanged. This is why `route-map PASS` is applied to all neighbors.
@@ -463,7 +463,7 @@ exit
 
 ---
 
-## Step 4 — Extensive Verification
+## Task 4 — Extensive Verification
 
 ### 4.1 FRR Running Configuration
 
@@ -1261,7 +1261,7 @@ All pings succeed with 0% packet loss. The underlay is healthy and ready for VXL
 
 ---
 
-## Step 5 — Configuration Persistence
+## Task 5 — Configuration Persistence
 
 Remember that in `split-unified` mode, SONiC maintains two separate configuration stores that must both
 be saved independently:
@@ -1308,7 +1308,7 @@ You should see your full FRR running configuration persisted — BGP router conf
 > daemon configuration.
 ---
 
-## Step 6 — Dynamic Prefix Advertisement
+## Task 6 — Dynamic Prefix Advertisement
 
 To test how dynamic updates propagate through the fabric and reinforce how FRR prefix-lists act as policy filters, let's create a new loopback interface on Leaf1 and advertise it to the rest of the fabric.
 
