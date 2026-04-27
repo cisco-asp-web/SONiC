@@ -6,12 +6,18 @@
 
 SONiC implements Access Control Lists (ACLs) in the switch pipeline to permit or drop traffic on specific ports and tuple matches, and Control Plane Policing (CoPP) to queue, police, and prioritize traffic that is punted to the CPU. In this lab you will work through two complementary topics: L4-aware ingress ACL configuration and verification, and read-only verification that traces CoPP policy from configuration through SWSS to the data stores the system uses at runtime.
 
+> **Scope** · Cisco **8000** · SONiC · **Ingress ACL** (ICMP permit, TCP **dport 80** drop) · **CoPP** read-only verification
+
+**Hands-on** L4-aware **ingress ACL** configuration and **read-only CoPP** checks—structured for **training**, **acceptance testing**, and **operator runbooks**.
 
 | Track | What you build / verify | Primary artifacts |
 |:-----:|-------------------------|---------------------|
 | **1** | **L3-type** ingress ACL on **Ethernet0** — **`IP_PROTOCOL`**, **`L4_DST_PORT`**, **`PACKET_ACTION`** | **`acl_L4.json`**, **`show acl`**, **`aclshow`**, **`counterpoll`**, **`sudo show platform npu acl`**, optional **Redis** **`ACL_RULE`** |
 | **2** | CoPP path from **seed** to **STATE_DB** | **`copp_cfg.json`**, **swss** / **orchagent** / **coppmgrd**, **APPL_DB** **`COPP_TABLE`**, **`swss.rec`**, **`COPP_GROUP_TABLE`** |
 
+> **Persistence** — After **`config load`**, lab **`ACL_TABLE`** / **`ACL_RULE`** usually land in **`/etc/sonic/config_db.json`** and survive **`config reload`** / **reboot** until removed (**`vi`**, **`config`**, or approved tooling). Plan ACL retirement in your environment if you must not keep **`ACL_DENY`** on **Ethernet0**.
+
+**Conventions:** Each exercise flows **objectives → prerequisites → commands → sample output → checklists**. Prompts show **`admin@…`**; use **`sudo`** where indicated.
 
 ---
 
@@ -60,8 +66,7 @@ After this lab you should be able to:
 |------|--------|
 | **Platform** | SONiC on **Cisco 8000** |
 | **Access** | Operator with **sudo**; CoPP steps use **`docker exec`** into **swss** where noted |
-| **Change vs read-only** | **Exercise 1** **writes** **CONFIG_DB** via **`config load`**. 
-**Exercise 2** **Verification Steps 1–5** are **read-only** (no CoPP policy edits in this guide) |
+| **Change vs read-only** | **Exercise 1** **writes** **CONFIG_DB** via **`config load`**. **Exercise 2** **Verification Steps 1–5** are **read-only** (no CoPP policy edits in this guide) |
 | **Outputs** | Samples show **shape** only — hostnames, times, PIDs, **Redis** DB numbers, **ACL IDs**, and **orchagent** args differ by image |
 
 ---
@@ -470,11 +475,7 @@ sudo show platform npu acl ace -a 10483 -p 1
 - Trace **seed CoPP** → **SWSS** → **APPL_DB** **`COPP_TABLE`** → **`swss.rec`** → **STATE_DB** **`COPP_GROUP_TABLE`**.
 - Keep **Verification Steps 1–5** as **read-only** inspection; **policy** edits stay in your **change process**.
 
-**Use this track when** 
-
-· post-**install** / **upgrade** 
-· **CONFIG_DB** touched CoPP 
-· **control-plane** symptoms (**BGP** churn, neighbor loss, high punt CPU).
+**Use this track when** · post-**install** / **upgrade** · **CONFIG_DB** touched CoPP · **control-plane** symptoms (**BGP** churn, neighbor loss, high punt CPU).
 
 **Read once** · **CoPP theory** (below) for **`copp_cfg.json`**, **`default`** group, **trap vs copy**, **SR_TCM**, Q200-style trap map. **Samples** show **shape** only—compare live output to **`cat /etc/sonic/copp_cfg.json`** on **this** device (**PIDs**, **Redis DB indices**, **MAC** args differ by image).
 
