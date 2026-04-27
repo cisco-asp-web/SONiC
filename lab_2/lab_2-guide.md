@@ -970,7 +970,8 @@ ASIC_DB keys are SAI object types with JSON-encoded key fields. The main ones fo
 ```bash
 sonic-db-cli ASIC_DB keys 'ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY:*'
 ```
-> [!NOTE] Each SONiC device will have it's own unique OID for the pod so you will need to substitute your routers OID output to the below commands.
+> [!NOTE]
+> Each SONiC device will have it's own unique OID for the pod so you will need to substitute your routers OID output to the below commands.
 >
 
 **Leaf1** output (IPv4 entries only):
