@@ -840,7 +840,7 @@ This is a fundamentally different view from `show ip route` in `vtysh`. Understa
 | **`proto bgp`** filter | N/A                        | Filters to routes installed by FRR  |
 
 
-Type this command on leaf1 (no on vtysh):
+Type this command on leaf1 (not on vtysh):
 
 ```bash
 ip route show proto bgp
