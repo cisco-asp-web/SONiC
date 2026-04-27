@@ -1,4 +1,4 @@
-# Cisco 8000 SONiC — L4 ACL & CoPP Lab Guide
+# Cisco 8000 SONiC — L4 ACL & CoPP Lab Guide [90 min]
 
 ---
 
