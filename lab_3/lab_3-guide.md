@@ -1,4 +1,4 @@
-# Lab 3 Guide: SONiC Automation on Cisco 8000 [25 Min]
+# Lab 3 Guide: SONiC Automation on Cisco 8000 [45 Min]
 
 ---
 
