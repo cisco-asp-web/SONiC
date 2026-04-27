@@ -470,15 +470,14 @@ sudo show platform npu acl ace -a 10483 -p 1
 - Trace **seed CoPP** → **SWSS** → **APPL_DB** **`COPP_TABLE`** → **`swss.rec`** → **STATE_DB** **`COPP_GROUP_TABLE`**.
 - Keep **Verification Steps 1–5** as **read-only** inspection; **policy** edits stay in your **change process**.
 
-**Use this track when** 
+**Use this track when**: 
 
-· post-**install** / **upgrade** 
-· **CONFIG_DB** touched CoPP 
-· **control-plane** symptoms (**BGP** churn, neighbor loss, high punt CPU).
+- post-**install** / **upgrade** 
+- **CONFIG_DB** touched CoPP 
+- **control-plane** symptoms (**BGP** churn, neighbor loss, high punt CPU).
 
 **Read once** · **CoPP theory** (below) for **`copp_cfg.json`**, **`default`** group, **trap vs copy**, **SR_TCM**, Q200-style trap map. **Samples** show **shape** only—compare live output to **`cat /etc/sonic/copp_cfg.json`** on **this** device (**PIDs**, **Redis DB indices**, **MAC** args differ by image).
 
-Each **Verification Step**: **Why** first, then bullets + code for **what** it proves.
 
 ---
 
