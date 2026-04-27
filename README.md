@@ -12,13 +12,13 @@ Though it is easy to run SONiC in a virtualized lab environment (sonic-vs, conta
 
 ### SONiC Workshop #1
 * Lab Topology (TBD)
-* Lab 0 - Connecting to your lab pod and accessing SONiC nodes [LINK](./lab_0/lab_0_Getting_started.md)
+* Lab 0 - Connecting to your lab pod and accessing SONiC nodes [LINK](./lab_0/lab_0-Getting_started.md)
 * Lab 1 - Intro to Cisco 8000 Emulator, Image Management, Config Management [LINK](./lab_1/lab_1-guide.md)
 * Lab 2 - SONiC and FRR, Building a BGP Fabric [LINK](./lab_2/lab_2-guide.md)
 * Lab 3 - SONiC Automation on Cisco 8000 [LINK](./lab_3/lab_3-guide.md)
 * Lab 4 - SONiC ACL, CoPP, and Packet Mirroring [LINK](./lab_4/lab_4-guide.md)
 
-### SONiC Workshop #2
+### SONiC Workshop #2 (To Be Scheduled)
 * Lab 5 - SONiC and FRR, Building a VXLAN EVPN Fabric [LINK](./lab_5/lab_5-guide.md)
 * Lab 6 - SONiC Building an AI Backend Network on Cisco 8000 [LINK](./lab_6/lab_6-guide.md)
 * Lab 7 - SONiC and troubleshooting optical transceivers 
