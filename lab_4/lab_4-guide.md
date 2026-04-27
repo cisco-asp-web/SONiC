@@ -4,7 +4,7 @@
 
 ## Introduction
 
-Lab 4 explores SONiC's ACL support and CoPP for securing the control plane. 
+SONiC implements Access Control Lists (ACLs) in the switch pipeline to permit or drop traffic on specific ports and tuple matches, and Control Plane Policing (CoPP) to queue, police, and prioritize traffic that is punted to the CPU. In this lab you will work through two complementary topics: L4-aware ingress ACL configuration and verification, and read-only CoPP verification that traces CoPP policy from configuration through SWSS to the data stores the system uses at runtime.
 
 > **Scope** · Cisco **8000** · SONiC · **Ingress ACL** (ICMP permit, TCP **dport 80** drop) · **CoPP** read-only verification
 
