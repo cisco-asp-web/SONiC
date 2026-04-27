@@ -8,6 +8,8 @@ Though it is easy to run SONiC in a virtualized lab environment (sonic-vs, conta
 
 
 ## Contents
+* Docker 101/202 Guide - A quick primer on Docker concepts for this lab [LINK](./docker_101_202.md)
+
 ### SONiC Workshop #1
 * Lab Topology (TBD)
 * Lab 0 - Connecting to your lab pod and accessing SONiC nodes [LINK](./lab_0/lab_0_Getting_started.md)
