@@ -709,4 +709,4 @@ This lab is complete. You have:
 
 Both Ansible and gNMI can be combined: use Ansible for orchestrating multi-device workflows and gNMI for granular, real-time device interactions.
 
-Proceed to [**Lab 4 (Cisco 8000 SONiC — L4 ACL & CoPP)**](../lab_4/lab_4-guide.md) where we'll construct ACLs and secure SONiC's control plane.
+Proceed to [**Lab 4**](../lab_4/lab_4-guide.md) where we'll construct ACLs and secure SONiC's control plane.
