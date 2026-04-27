@@ -1297,12 +1297,9 @@ docker exec bgp cat /etc/frr/frr.conf
 
 ⚠️ **Warning:** if you do a `sudo cat /etc/frr/frr.conf` from the linux host (device itself) it will return an error as frr.conf does NOT exist on the linux host but within the bgp container as explained previously
 
-Check the configuration on **Leaf1**:
-
-```bash
-docker exec bgp cat /etc/frr/frr.conf
-```
-
+> [!NOTE]
+> The FRR config can be found in the SONiC host filesystem at /etc/sonic/frr/frr.conf . The directory can only be accessed by root and is mirrored by a daemon from the frr.conf config in the FRR container. 
+> 
 You should see your full FRR running configuration persisted — BGP router config, prefix-lists, route-maps, and `RM_SET_SRC`.
  This confirms FRR will restore all BGPadjacencies upon a device reboot.
 
