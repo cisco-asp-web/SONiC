@@ -1,5 +1,5 @@
 # Introduction to SONiC & SONiC Configuration
-## Lab 1 — 3-Leaf / 1-Spine
+## Lab 1
 
 ---
 
