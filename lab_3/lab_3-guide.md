@@ -94,7 +94,7 @@ mkdir -p ~/sonic-automation
 cd ~/sonic-automation
 ```
 
-Create `~/sonic-automation/inventory.yaml` with the following content:
+Create `~/sonic-automation/inventory.yaml` with the following content using vi from the cli:
 
 ```yaml
 leaf_switches:
