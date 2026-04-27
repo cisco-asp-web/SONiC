@@ -40,15 +40,6 @@ ssh -p 2203 suhahmad@10.29.209.5
 
 ## Step 2 — Explore Your Environment
 
-Once logged in you'll find:
-
-```
-~/lab/
-└── ansible/
-    ├── ansible.cfg    # pre-configured defaults
-    └── inventory.ini  # your pod's device IPs, ready to use
-```
-
 Your **SSH config** has also been pre-populated, so you can reach any device
 in your pod by short name:
 
