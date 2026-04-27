@@ -8,8 +8,6 @@ This lab walks you through building a VXLAN EVPN overlay on top of an existing e
 
 Two leaves (Leaf1 and Leaf2) share a multihomed host via an active-active LACP PortChannel and a common Ethernet Segment Identifier (ESI). A third leaf (Leaf3) has two single-homed hosts in separate subnets. By the end of the lab you will have a working VXLAN fabric with L2 extension, L3 routing (symmetric IRB), and EVPN multihoming.
 
-**SONiC version:** FRR 8.5.x, `split-unified` routing mode
-
 ---
 
 ## Table of Contents
