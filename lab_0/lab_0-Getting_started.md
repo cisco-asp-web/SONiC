@@ -132,4 +132,4 @@ Device password: **`password`**
 Raise your hand or message the instructor in the chat. Don't struggle
 silently — we're here to help!
 
-**Please proceed to Lab_1**: [LINK](../lab_1/lab_1_guide.md)
+**Please proceed to Lab_1**: [LINK](../lab_1/lab_1-guide.md)
