@@ -11,7 +11,7 @@ Though it is easy to run SONiC in a virtualized lab environment (sonic-vs, conta
 * Docker 101/202 Guide - A quick primer on Docker concepts for this lab [LINK](./docker_101_202.md)
 
 ### SONiC Workshop #1
-* Lab Topology (TBD)
+* Lab Topology [LINK](./drawings/topology-base-view.png)
 * Lab 0 - Connecting to your lab pod and accessing SONiC nodes [LINK](./lab_0/lab_0-Getting_started.md)
 * Lab 1 - Intro to Cisco 8000 Emulator, Image Management, Config Management [LINK](./lab_1/lab_1-guide.md)
 * Lab 2 - SONiC and FRR, Building a BGP Fabric [LINK](./lab_2/lab_2-guide.md)
