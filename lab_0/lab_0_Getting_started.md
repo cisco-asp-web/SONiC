@@ -123,20 +123,7 @@ Device password: **`password`**
   instructor starts the lab.
 - Try `ssh leaf1` and check if the connection times out or is refused.
 - Ask your instructor to verify the pod status.
-
-**Ansible returns `unreachable`?**
-- Same as above — device may not be ready yet.
-- Check `~/lab/ansible/inventory.ini` to confirm the IPs look correct.
-
-```bash
-        [leaves]
-        podN-leaf1  ansible_host=192.168.122.36
-        podN-leaf2  ansible_host=192.168.122.37
-        podN-leaf3  ansible_host=192.168.122.38
-
-        [spines]
-        podN-spine4  ansible_host=192.168.122.39
-```
+    podN-spine4  ansible_host=192.168.122.39
 
 ---
 
