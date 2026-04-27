@@ -125,7 +125,7 @@ leaf1 | SUCCESS => {
 
 The simplest approach: run SONiC CLI commands directly through an SSH shell. This is the same as if you SSH'd into the device and typed the commands yourself.
 
-Create `~/sonic-automation/vlan_cli.yml` with the following content:
+Create `~/sonic-automation/vlan_cli.yaml` with the following content:
 
 ```yaml
 ---
@@ -159,7 +159,7 @@ Create `~/sonic-automation/vlan_cli.yml` with the following content:
 **Run** — Execute the playbook:
 
 ```bash
-ansible-playbook -i inventory.yaml vlan_cli.yml
+ansible-playbook -i inventory.yaml vlan_cli.yaml
 ```
 
 ```
@@ -244,7 +244,7 @@ export htt2_proxy="proxy-wsa.esl.cisco.com:80"
 ansible-galaxy collection install cisco.sonic
 ```
 
-Create `~/sonic-automation/verify_and_configure.yml` with the following content:
+Create `~/sonic-automation/verify_and_configure.yaml` with the following content:
 
 ```yaml
 ---
@@ -289,7 +289,7 @@ Create `~/sonic-automation/verify_and_configure.yml` with the following content:
 **Run** — Execute the playbook:
 
 ```bash
-ansible-playbook -i inventory.yaml verify_and_configure.yml
+ansible-playbook -i inventory.yaml verify_and_configure.yaml
 ```
 
 #### Key Features of `cisco.sonic`
