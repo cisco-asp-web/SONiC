@@ -350,6 +350,7 @@ ping 3.4.1.3 -c 3   # Leaf3 via Ethernet8
 **Leaf1:**
 
 ```
+conf t
 ip prefix-list LOOPBACKS seq 5 permit 1.1.1.1/32
 
 route-map PASS permit 10
@@ -378,6 +379,7 @@ exit
 **Leaf2:**
 
 ```
+conf t
 ip prefix-list LOOPBACKS seq 5 permit 2.2.2.2/32
 
 route-map PASS permit 10
@@ -406,6 +408,7 @@ exit
 **Leaf3:**
 
 ```
+conf t
 ip prefix-list LOOPBACKS seq 5 permit 3.3.3.3/32
 
 route-map PASS permit 10
@@ -434,6 +437,7 @@ exit
 **Spine4:**
 
 ```
+conf t
 route-map PASS permit 10
 exit
 
