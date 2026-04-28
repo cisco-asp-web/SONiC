@@ -14,25 +14,10 @@ SONiC implements Access Control Lists (ACLs) in the switch pipeline to permit or
   - [Introduction](#introduction)
   - [Table of Contents](#table-of-contents)
   - [Lab Objectives](#lab-objectives)
-  - [Lab Environment](#lab-environment)
-    - [Credentials](#credentials)
-    - [gNMI](#gnmi)
-  - [Task 1 — Ansible Automation](#task-1--ansible-automation)
-    - [1.1 Ansible Inventory](#11-ansible-inventory)
-
----
-
-## Guide flow (recommended order)
-
-| Step | Phase | Outcome |
-|:---:|:---|:---|
-| **1** | **Exercise 1** | Baseline **HTTP** → **`config load`** **`acl_L4.json`** → verify CLI, counters, NPU (**Redis** optional) |
-| **2** | **Exercise 2** | CoPP **Verification Steps 1–5** (read-only): **`copp_cfg.json`**, **swss**, **APPL_DB**, **`swss.rec`**, **STATE_DB** |
-
-```mermaid
-flowchart LR
-  A["Exercise 1\nACL + HTTP lab"] --> C["Exercise 2\nCoPP verification"]
-```
+  - [Lab Environment and Shared  Prerequisites](#lab-environment-and-shared-prerequisites)
+  - [Task 1 — L4 Ingress ACL and Verification](#task-1--l4-ingress-acl-and-verification)
+    - [1.1 — L4 TCP destination port 80 (HTTP)](#1.1--l4-tcp-destination-port-80-http)
+  - [Task 2 — CoPP: Verification](#task-2--copp:-verification)
 
 ---
 
@@ -40,11 +25,11 @@ flowchart LR
 
 After this lab you should be able to:
 
-| # | Skill |
-|:-:|---------|
-| 1 | **ACL (Exercise 1):** Author **Config DB** JSON for an **L3-type** **INGRESS** ACL on a port using **`IP_PROTOCOL`**, **`L4_DST_PORT`**, and **`PACKET_ACTION`** (**FORWARD** / **DROP**); **`config load`**; validate with **`show acl`**, **`counterpoll`**, **`aclshow`**, and **`sudo show platform npu acl`**; interpret optional **Redis** **`ACL_RULE`** / **`ACL_RULE_TABLE`** keys. |
-| 2 | **ACL:** Prove **HTTP** is blocked while **ICMP** is forwarded using **`show acl`**, **`aclshow`**, and **NPU** views. |
-| 3 | **CoPP (Exercise 2):** Explain **`copp_cfg.json`** (**`COPP_TRAP`** → **`COPP_GROUP`**); verify **swss** / **orchagent** / **coppmgrd**; read **APPL_DB** **`COPP_TABLE`**, **`swss.rec`**, and **STATE_DB** **`COPP_GROUP_TABLE`** against the seed. |
+- Learn about the ACL structures in SONiC and how to apply configuration.
+- How to create an ACL json structured file and apply
+- Verification steps for ACLs from configuration files and various redis databases
+- Learn about CoPP in SONiC and the default configuration
+- Verification steps for CoPP policy from configuration files and various redis databases
 
 ---
 
@@ -60,7 +45,7 @@ After this lab you should be able to:
 
 ---
 
-## Exercise 1 — L4 ingress ACL and verification
+## Task 1 — L4 ingress ACL and Verification
 
 | Role | In this capture |
 |:-----|:-----------------|
@@ -80,7 +65,7 @@ Each subsection: **why** the step matters, then bullets before code blocks for *
 
 ---
 
-### Example 1 — L4 TCP destination port 80 (HTTP)
+### 1.1 — L4 TCP destination port 80 HTTP
 
 This example uses the **L3** ACL **table type** on **Ethernet0** (**pod8-leaf3** in the capture) but matches **IP protocol** and **TCP destination port 80**. A **higher-priority** rule (**`PRIORITY`** **10**) **forwards ICMP** so echo/traceroute-style traffic can still work; a **lower-priority** rule (**20**) **drops TCP** to port **80** so HTTP clients time out. In SONiC, **lower numeric `PRIORITY`** is **higher precedence** in typical **`show acl rule`** ordering.
 
@@ -457,7 +442,7 @@ sudo show platform npu acl ace -a 10483 -p 1
 
 ---
 
-## Exercise 2 — CoPP: verification
+## Task 2 — CoPP: Verification
 
 ### Objectives
 
