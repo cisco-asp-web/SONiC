@@ -123,7 +123,6 @@ Device password: **`password`**
   instructor starts the lab.
 - Try `ssh leaf1` and check if the connection times out or is refused.
 - Ask your instructor to verify the pod status.
-    podN-spine4  ansible_host=192.168.122.39
 
 ---
 
