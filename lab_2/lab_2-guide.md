@@ -1567,4 +1567,4 @@ Lab 2 is complete. You have:
 * Confirm end-to-end reachability across the fabric
 * Inspect BGP routing state in the SONiC Redis database
 
-Proceed to [**Lab 3 (Automation)**](../lab_3/lab_3_guide.md) to learn about automation capabilities for SONiC.
+Proceed to [**Lab 3 (Automation)**](../lab_3/lab_3-guide.md) to learn about automation capabilities for SONiC.
