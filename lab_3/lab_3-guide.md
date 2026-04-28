@@ -416,7 +416,7 @@ sudo config save -y
 The capabilities RPC tells you which YANG models the device supports, the gNMI version, and the supported encodings.
 
 ```bash
-gnmic -a localhost:50051 \
+gnmic -a 1.18.1.3:50051 \
   -u admin -p password \
   --insecure \
   capabilities
@@ -453,7 +453,7 @@ The `sonic-db` model allows you to query any SONiC Redis database (CONFIG_DB, AP
 **GET a port entry from CONFIG_DB:**
 
 ```bash
-gnmic -a localhost:50051 \
+gnmic -a 1.18.1.3:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -489,7 +489,7 @@ This returns exactly what you would see by running `redis-cli -n 4` and issuing 
 **GET VLAN configuration:**
 
 ```bash
-gnmic -a localhost:50051 \
+gnmic -a 1.18.1.3:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -502,7 +502,7 @@ gnmic -a localhost:50051 \
 You can target any SONiC database by changing `--target`:
 
 ```bash
-gnmic -a localhost:50051 \
+gnmic -a 1.18.1.3:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -523,7 +523,7 @@ The native YANG models are maintained at: https://github.com/sonic-net/sonic-bui
 **GET a port using native YANG:**
 
 ```bash
-gnmic -a localhost:50051 \
+gnmic -a 1.18.1.3:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -533,7 +533,7 @@ gnmic -a localhost:50051 \
 ```json
 [
   {
-    "source": "localhost:50051",
+    "source": "1.18.1.3:50051",
     "timestamp": 1764723311188651240,
     "time": "2025-12-02T16:55:11.18865124-08:00",
     "updates": [
@@ -572,7 +572,7 @@ OpenConfig models provide a vendor-neutral view of device configuration and stat
 **GET an interface using OpenConfig:**
 
 ```bash
-gnmic -a localhost:50051 \
+gnmic -a 1.18.1.3:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -583,7 +583,7 @@ Output (abbreviated):
 ```json
 [
   {
-    "source": "localhost:50051",
+    "source": "1.18.1.3:50051",
     "updates": [
       {
         "Path": "openconfig-interfaces:interfaces/interface[name=Ethernet0]",
@@ -656,7 +656,7 @@ gNMI is not just for reading — you can also push configuration changes using t
 **Update MTU via sonic-db:**
 
 ```bash
-gnmic -a localhost:50051 \
+gnmic -a 1.18.1.3:50051 \
   -u admin -p password \
   --insecure \
   set \
@@ -668,7 +668,7 @@ gnmic -a localhost:50051 \
 **Update MTU via OpenConfig:**
 
 ```bash
-gnmic -a localhost:50051 \
+gnmic -a 1.18.1.3:50051 \
   -u admin -p password \
   --insecure \
   set \
