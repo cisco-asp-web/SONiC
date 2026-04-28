@@ -39,8 +39,8 @@ After this lab you should be able to:
 |------|--------|
 | **Platform** | SONiC on **Cisco 8000** |
 | **Access** | Operator with **sudo**; CoPP steps use **`docker exec`** into **swss** where noted |
-| **Change vs read-only** | **Exercise 1** **writes** **CONFIG_DB** via **`config load`**. 
-**Exercise 2** **Verification Steps 1–5** are **read-only** (no CoPP policy edits in this guide) |
+| **Change vs read-only** | **Task 1** **writes** **CONFIG_DB** via **`config load`**. 
+**Task 2** **Verification Steps 1–5** are **read-only** (no CoPP policy edits in this guide) |
 | **Outputs** | Samples show **shape** only — hostnames, times, PIDs, **Redis** DB numbers, **ACL IDs**, and **orchagent** args differ by image |
 
 ---
@@ -433,7 +433,7 @@ sudo show platform npu acl ace -a 10483 -p 1
  | 10483  |    1     |    1/255    | 0.0.0.0/0.0.0.0 | 0.0.0.0/0.0.0.0 |
 ```
 
-### Example 1 — Verification checklist
+### Task 1 — Verification checklist
 
 - [ ] **`show acl rule`** — **10-ALLOW-ICMP** (**FORWARD**, **IP_PROTOCOL** 1) and **20-DENY-HTTP** (**DROP**, **IP_PROTOCOL** 6, **L4_DST_PORT** 80), both **Active**
 - [ ] **`show acl table`** — **ACL_DENY** on **Ethernet0**, description **ALLOW ICMP, BLOCK HTTP**
@@ -851,4 +851,4 @@ Run **in order** for **post-change** validation, **upgrade** acceptance, or **in
 
 ### About the sample output
 
-> **Sample output** — **Exercise 1** counters vary with traffic and timing. **Exercise 2** excerpts reflect **Cisco 8000** SONiC validation runs. **Redis DB indices**, **ACL IDs**, **PIDs**, and **timestamps** differ by branch—**confirm on your device** before sign-off.
+> **Sample output** — **Task 1** counters vary with traffic and timing. **Task 2** excerpts reflect **Cisco 8000** SONiC validation runs. **Redis DB indices**, **ACL IDs**, **PIDs**, and **timestamps** differ by branch—**confirm on your device** before sign-off.
