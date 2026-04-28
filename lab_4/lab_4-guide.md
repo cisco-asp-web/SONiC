@@ -1,4 +1,4 @@
-# Cisco 8000 SONiC — L4 ACL & CoPP Lab Guide [90 min]
+# Lab 4 Guide: ACL and CoPP on Cisco 8000 [90 Min]
 
 ---
 
@@ -6,17 +6,20 @@
 
 SONiC implements Access Control Lists (ACLs) in the switch pipeline to permit or drop traffic on specific ports and tuple matches, and Control Plane Policing (CoPP) to queue, police, and prioritize traffic that is punted to the CPU. In this lab you will work through two complementary topics: L4-aware ingress ACL configuration and verification, and read-only verification that traces CoPP policy from configuration through SWSS to the data stores the system uses at runtime.
 
-
-| Track | What you build / verify | Primary artifacts |
-|:-----:|-------------------------|---------------------|
-| **1** | **L3-type** ingress ACL on **Ethernet0** — **`IP_PROTOCOL`**, **`L4_DST_PORT`**, **`PACKET_ACTION`** | **`acl_L4.json`**, **`show acl`**, **`aclshow`**, **`counterpoll`**, **`sudo show platform npu acl`**, optional **Redis** **`ACL_RULE`** |
-| **2** | CoPP path from **seed** to **STATE_DB** | **`copp_cfg.json`**, **swss** / **orchagent** / **coppmgrd**, **APPL_DB** **`COPP_TABLE`**, **`swss.rec`**, **`COPP_GROUP_TABLE`** |
-
-
 ---
 
 ## Table of contents
 
+- [Lab 4 Guide: ACL and CoPP on Cisco 8000 \[90 Min\]](#lab-4-guide:-acl-and-copp-on-cisco-8000-[90-min])
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
+  - [Lab Objectives](#lab-objectives)
+  - [Lab Environment](#lab-environment)
+    - [Credentials](#credentials)
+    - [gNMI](#gnmi)
+  - [Task 1 — Ansible Automation](#task-1--ansible-automation)
+    - [1.1 Ansible Inventory](#11-ansible-inventory)
+  
 | # | Section |
 |:-:|---------|
 | 1 | [Learning objectives](#learning-objectives) |
