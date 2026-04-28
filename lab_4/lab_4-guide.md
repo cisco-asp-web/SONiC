@@ -945,3 +945,6 @@ Run **in order** for **post-change** validation, **upgrade** acceptance, or **in
 ### About the sample output
 
 > **Sample output** — **Task 1** counters vary with traffic and timing. **Task 2** excerpts reflect **Cisco 8000** SONiC validation runs. **Redis DB indices**, **ACL IDs**, **PIDs**, and **timestamps** differ by branch—**confirm on your device** before sign-off.
+
+
+## End of Lab 4
