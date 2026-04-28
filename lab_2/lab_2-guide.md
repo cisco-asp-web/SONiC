@@ -118,7 +118,7 @@ docker exec bgp cat /etc/frr/frr.conf
 Expected: `"docker_routing_config_mode": "split-unified"`
 
 
-If the devices are not running in `split mode` , please run the following:
+If the devices are not running in `split-unified` , please run the following:
 
 ```bash
 cat > /tmp/routing_mode.json << 'EOF'
