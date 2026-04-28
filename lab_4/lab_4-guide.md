@@ -442,7 +442,7 @@ sudo show platform npu acl ace -a 10483 -p 1
 
 ---
 
-## Task 2 — CoPP: Verification
+## Task 2 — CoPP Verification
 
 ### Objectives
 
@@ -468,7 +468,7 @@ sudo show platform npu acl ace -a 10483 -p 1
 
 ---
 
-### What CoPP does (one paragraph)
+### Explain CoPP Service
 
 CoPP maps **ASIC trap classes** (BGP, LACP, ARP, LLDP, packets to local IPs, and so on) to **policer parameters** (CIR/CBS), **CPU queue**, **trap vs copy**, and **priority**. The goal is to **protect the control plane** from floods while keeping protocols stable. This is **not** the same as a front-panel **L3 ACL** on data-plane traffic.
 
