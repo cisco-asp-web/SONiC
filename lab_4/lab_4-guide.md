@@ -48,7 +48,7 @@ After this lab you should be able to:
 ## Task 1 SONiC ACL Overview
 The core of ACLs in SONiC is the ACL Table which links interface(s) with rule sets and defines the direction of the policy enforcement. See the diagram below to see the relationship.
 
-![ACL Overview](./drawings/acl-overview.png)
+![ACL Overview](../drawings/acl-overview.png)
 
 ACLs can be grouped into three general categories:
     1. Data-plane ACLs applied against physical interfaces
