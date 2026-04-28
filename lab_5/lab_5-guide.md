@@ -420,6 +420,8 @@ router bgp 1
  !
  address-family l2vpn evpn
   neighbor 4.4.4.4 activate
+  neighbor 4.4.4.4 route-map PASS in
+  neighbor 4.4.4.4 route-map PASS out
   advertise-all-vni
   no use-es-l3nhg
   vni 1010
@@ -439,6 +441,8 @@ router bgp 2
  !
  address-family l2vpn evpn
   neighbor 4.4.4.4 activate
+  neighbor 4.4.4.4 route-map PASS in
+  neighbor 4.4.4.4 route-map PASS out
   advertise-all-vni
   no use-es-l3nhg
   vni 1010
@@ -458,6 +462,8 @@ router bgp 3
  !
  address-family l2vpn evpn
   neighbor 4.4.4.4 activate
+  neighbor 4.4.4.4 route-map PASS in
+  neighbor 4.4.4.4 route-map PASS out
   advertise-all-vni
   no use-es-l3nhg
   vni 1010
@@ -557,6 +563,8 @@ router bgp 4
  !
  address-family l2vpn evpn
   neighbor EVPN activate
+  neighbor EVPN route-map PASS in
+  neighbor EVPN route-map PASS out
   neighbor EVPN route-server-client
   neighbor EVPN attribute-unchanged as-path next-hop med
  exit-address-family
