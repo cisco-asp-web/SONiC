@@ -31,7 +31,8 @@ SONiC runs on Debian Linux and exposes multiple configuration interfaces: a Pyth
     - [2.5 OpenConfig GET](#25-openconfig-get)
     - [2.6 Comparing the Three gNMI Models](#26-comparing-the-three-gnmi-models)
     - [2.7 gNMI SET — Making Configuration Changes](#27-gnmi-set--making-configuration-changes)
-  - [End of Lab](#end-of-lab)
+   - [2.8 gNMI SUBSCRIBE — Streaming Telemetry](#28-gnmi-subscribe--streaming-telemetry)
+4. [End of Lab](#end-of-lab)
 
 ---
 
@@ -46,6 +47,7 @@ By completing this lab you will be able to:
 - Identify the three gNMI data models: SONiC DB, SONiC Native YANG, and OpenConfig
 - Read and interpret gNMI GET responses across all three models
 - Understand gNMI SET for pushing configuration changes
+- Subscribe to streaming telemetry with gNMI SUBSCRIBE
 
 ---
 
@@ -332,11 +334,68 @@ SONiC's gNMI server supports three types of data models:
 | **SONiC Native YANG** | `sonic-module:container/list[key=value]` | `sonic-port:sonic-port/PORT/PORT_LIST[name=Ethernet0]` |
 | **OpenConfig** | `openconfig-module:container/list[key=value]` | `openconfig-interfaces:interfaces/interface[name=Ethernet0]` |
 
+> **Important:** gNMI support is determined at **image build time**. The SONiC build system uses flags like `INCLUDE_SYSTEM_GNMI`, `ENABLE_TRANSLIB_WRITE`, and `ENABLE_NATIVE_WRITE` in `rules/config` to control whether the gNMI container is included and which write operations are permitted. The YANG models available for gNMI queries (OpenConfig, SONiC native YANG) are also packaged during the build. Work with your Cisco team to ensure your image has the appropriate gNMI and model support.
+
 ---
 
 ### 2.1 Enabling gNMI on SONiC
 
-Before using gNMI, the gNMI server must be configured on the device. SONiC's gNMI server is managed through the `GNMI` table in CONFIG_DB.
+Before using gNMI, the gNMI server must be configured on the device. SONiC's gNMI server is managed through the `GNMI` table in CONFIG_DB, which has two keys: `GNMI|gnmi` for server settings and `GNMI|certs` for TLS certificates.
+
+#### GNMI CONFIG_DB Schema
+
+The full configuration schema with all available fields:
+
+```
+{
+    "GNMI": {
+        "gnmi": {
+            "port": "<port-number>",
+            "client_auth": "true|false",
+            "log_level": "<0-7>",
+            "threshold": "<max-connections>",
+            "idle_conn_duration": "<seconds>",
+            "save_on_set": "true|false",
+            "user_auth": "password|cert",
+            "enable_crl": "true|false",
+            "crl_expire_duration": "<seconds>"
+        },
+        "certs": {
+            "server_crt": "<path-to-server-cert>",
+            "server_key": "<path-to-server-key>",
+            "ca_crt": "<path-to-ca-cert>"
+        }
+    }
+}
+```
+
+**`GNMI|gnmi` — Server settings:**
+
+| Field | Description |
+|-------|-------------|
+| `port` | TCP port the gNMI server listens on |
+| `client_auth` | When `false`, client certificates are not required |
+| `log_level` | Logging verbosity (higher = more verbose) |
+| `threshold` | Maximum number of concurrent connections handled sequentially |
+| `idle_conn_duration` | Seconds before the server closes idle client connections |
+| `save_on_set` | When `true`, automatically runs `config save` after every SET operation |
+| `user_auth` | Authentication mode: `password` (username/password via gRPC metadata) or `cert` (client certificate). When set to `cert`, the server reads allowed certificates from the `GNMI_CLIENT_CERT` CONFIG_DB table |
+| `enable_crl` | Enable certificate revocation list checking (only when `user_auth` is `cert`) |
+| `crl_expire_duration` | CRL cache expiry in seconds |
+
+**`GNMI|certs` — TLS certificate paths:**
+
+| Field | Description |
+|-------|-------------|
+| `server_crt` | Path to the server TLS certificate |
+| `server_key` | Path to the server TLS private key |
+| `ca_crt` | Path to the CA certificate for client certificate validation |
+
+> **TLS behavior:** If the `certs` key is absent (or `server_crt`/`server_key` are empty), the gNMI server starts in **non-TLS mode** (`--noTLS`). This is convenient for labs but should never be used in production.
+
+#### Practical Example — Lab Configuration
+
+In our lab we use non-TLS mode with password authentication. By omitting the `certs` section entirely, the server starts without TLS.
 
 **Run** — SSH into Leaf1:
 
@@ -344,25 +403,19 @@ Before using gNMI, the gNMI server must be configured on the device. SONiC's gNM
 ssh leaf1
 ```
 
-In our lab we will use non-TLS (insecure) mode. Create a JSON file that configures the gNMI server without client authentication:
+Using a text editor, create `/tmp/gnmi.json` with the following content:
 
-```bash
-cat > /tmp/gnmi.json << 'EOF'
+```json
 {
     "GNMI": {
-        "certs": {},
         "gnmi": {
             "client_auth": "false",
             "log_level": "2",
-            "port": "50051",
-            "save_on_set": "false"
+            "port": "50051"
         }
     }
 }
-EOF
 ```
-
-> **Note:** In a production environment, you would configure TLS certificates by populating the `certs` section with paths to `ca_crt`, `server_crt`, and `server_key`, and setting `client_auth` to `"true"`. Our lab uses insecure mode to simplify the exercises.
 
 **Run** — Load the configuration into CONFIG_DB:
 
@@ -370,7 +423,6 @@ EOF
 sudo config load /tmp/gnmi.json -y
 ```
 
-Expected output:
 ```
 Running command: /usr/local/bin/sonic-cfggen -j /tmp/gnmi.json --write-to-db
 ```
@@ -407,16 +459,16 @@ This confirms the gNMI server process is bound and listening on port 50051.
 sudo config save -y
 ```
 
-> **In our lab**, gNMI has already been enabled on Leaf1. The above walkthrough is provided so you understand how gNMI is configured on a SONiC device.
+> **In our lab**, your container cannot directly reach the gNMI port (50051) on the SONiC devices. The walkthrough above is provided so you understand how gNMI is configured. The instructor will demonstrate gNMI capabilities live on a device.
 
 ---
 
 ### 2.2 gNMI Capabilities
 
-The capabilities RPC tells you which YANG models the device supports, the gNMI version, and the supported encodings.
+The Capabilities RPC tells you which YANG models the device supports, the gNMI version, and the supported encodings.
 
 ```bash
-gnmic -a 1.18.1.3:50051 \
+gnmic -a 1.18.1.8:50051 \
   -u admin -p password \
   --insecure \
   capabilities
@@ -426,12 +478,13 @@ gnmic -a 1.18.1.3:50051 \
 gNMI version: 0.7.0
 supported models:
   - openconfig-acl, OpenConfig working group, 1.0.2
-  - openconfig-system, OpenConfig working group,
+  - openconfig-interfaces, OpenConfig working group,
   - openconfig-platform, OpenConfig working group,
   - openconfig-network-instance, OpenConfig working group,
   - openconfig-routing-policy, OpenConfig working group,
-  - openconfig-interfaces, OpenConfig working group,
+  - openconfig-sampling-sflow, OpenConfig working group,
   - openconfig-mclag, OpenConfig working group,
+  - openconfig-system, OpenConfig working group,
   - openconfig-lldp, OpenConfig working group, 1.0.2
   - openconfig-lldp-ext, SONiC, 0.1.0
   - ietf-yang-library, IETF NETCONF (Network Configuration) Working Group, 2016-06-21
@@ -453,7 +506,7 @@ The `sonic-db` model allows you to query any SONiC Redis database (CONFIG_DB, AP
 **GET a port entry from CONFIG_DB:**
 
 ```bash
-gnmic -a 1.18.1.3:50051 \
+gnmic -a 1.18.1.8:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -462,34 +515,37 @@ gnmic -a 1.18.1.3:50051 \
 ```
 
 ```json
-{
-  "notification": [
-    {
-      "timestamp": 1731590130064395032,
-      "update": [
-        {
-          "path": "PORT/Ethernet0",
-          "val": {
+[
+  {
+    "source": "1.18.1.8:50051",
+    "timestamp": 1777345110487030108,
+    "time": "2026-04-27T19:58:30.487030108-07:00",
+    "target": "CONFIG_DB",
+    "updates": [
+      {
+        "Path": "PORT/Ethernet0",
+        "values": {
+          "PORT/Ethernet0": {
             "admin_status": "up",
             "alias": "etp0",
             "index": "0",
-            "lanes": "2304,2305,2306,2307,2308,2309,2310,2311",
+            "lanes": "2304,2305,2306,2307",
             "mtu": "9100",
-            "speed": "400000"
+            "speed": "100000"
           }
         }
-      ]
-    }
-  ]
-}
+      }
+    ]
+  }
+]
 ```
 
-This returns exactly what you would see by running `redis-cli -n 4` and issuing `HGETALL PORT|Ethernet0` — but through a standard gNMI interface.
+This returns exactly what you would see by running `sonic-db-cli CONFIG_DB hgetall 'PORT|Ethernet0'` — but through a standard gNMI interface. Notice all values are strings — this is a characteristic of the Redis-backed sonic-db model.
 
 **GET VLAN configuration:**
 
 ```bash
-gnmic -a 1.18.1.3:50051 \
+gnmic -a 1.18.1.8:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -497,12 +553,37 @@ gnmic -a 1.18.1.3:50051 \
   --target CONFIG_DB
 ```
 
+```json
+[
+  {
+    "source": "1.18.1.8:50051",
+    "timestamp": 1777346234185824264,
+    "time": "2026-04-27T20:17:14.185824264-07:00",
+    "target": "CONFIG_DB",
+    "updates": [
+      {
+        "Path": "VLAN",
+        "values": {
+          "VLAN": {
+            "Vlan100": {
+              "vlanid": "100"
+            }
+          }
+        }
+      }
+    ]
+  }
+]
+```
+
+Using just `VLAN` as the path returns all VLANs. You can narrow it to a specific VLAN with `VLAN/Vlan100`.
+
 **GET from other databases:**
 
 You can target any SONiC database by changing `--target`:
 
 ```bash
-gnmic -a 1.18.1.3:50051 \
+gnmic -a 1.18.1.8:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -510,7 +591,92 @@ gnmic -a 1.18.1.3:50051 \
   --target APPL_DB
 ```
 
-> **Key takeaway:** The `--target` flag selects which Redis database to query. The `--path` follows the Redis key structure: `TABLE/KEY` or just `TABLE` to get all entries.
+```json
+[
+  {
+    "source": "1.18.1.8:50051",
+    "timestamp": 1777346235106918580,
+    "time": "2026-04-27T20:17:15.10691858-07:00",
+    "target": "APPL_DB",
+    "updates": [
+      {
+        "Path": "PORT_TABLE/Ethernet0",
+        "values": {
+          "PORT_TABLE/Ethernet0": {
+            "admin_status": "up",
+            "alias": "etp0a",
+            "index": "0",
+            "lanes": "2304,2305",
+            "mtu": "9100",
+            "oper_status": "down",
+            "speed": "100000"
+          }
+        }
+      }
+    ]
+  }
+]
+```
+
+Notice APPL_DB includes `oper_status` — this is the application-level state that orchagent uses to program the ASIC, as opposed to CONFIG_DB which only stores the desired configuration.
+
+**GET interface counters from COUNTERS_DB (virtual paths):**
+
+COUNTERS_DB stores raw SAI counters keyed by OID (e.g., `oid:0x100000000000f`). The sonic-db gNMI model supports **virtual paths** that let you use the interface name instead, and drill down to a specific counter:
+
+```bash
+gnmic -a 1.18.1.8:50051 \
+  -u admin -p password \
+  --insecure \
+  get \
+  --path COUNTERS/Ethernet0/SAI_PORT_STAT_IF_IN_OCTETS \
+  --target COUNTERS_DB
+```
+
+```json
+[
+  {
+    "source": "1.18.1.8:50051",
+    "timestamp": 1777346421140381531,
+    "time": "2026-04-27T20:20:21.140381531-07:00",
+    "target": "COUNTERS_DB",
+    "updates": [
+      {
+        "Path": "COUNTERS/Ethernet0/SAI_PORT_STAT_IF_IN_OCTETS",
+        "values": {
+          "COUNTERS/Ethernet0/SAI_PORT_STAT_IF_IN_OCTETS": "0"
+        }
+      }
+    ]
+  }
+]
+```
+
+The gNMI server automatically resolves `Ethernet0` to its OID via the `COUNTERS_PORT_NAME_MAP` table — you never need to look up OIDs manually.
+
+Virtual paths also support wildcards. To get a single counter across all ports:
+
+```bash
+gnmic -a 1.18.1.8:50051 \
+  -u admin -p password \
+  --insecure \
+  get \
+  --path "COUNTERS/Ethernet*/SAI_PORT_STAT_IF_IN_OCTETS" \
+  --target COUNTERS_DB
+```
+
+This returns `SAI_PORT_STAT_IF_IN_OCTETS` for every Ethernet port on the device in a single response — useful for building per-port traffic dashboards.
+
+The supported virtual path patterns for COUNTERS_DB:
+
+| Virtual Path | Returns |
+|-------------|---------|
+| `COUNTERS/Ethernet0` | All counters for one port |
+| `COUNTERS/Ethernet0/<counter_name>` | One specific counter for one port |
+| `COUNTERS/Ethernet*` | All counters for all ports |
+| `COUNTERS/Ethernet*/<counter_name>` | One counter across all ports |
+
+> **Key takeaway:** The `--target` flag selects which Redis database to query. The `--path` follows the Redis key structure: `TABLE/KEY` or just `TABLE` to get all entries. COUNTERS_DB supports virtual paths that resolve interface names to OIDs and allow drilling down to specific counters.
 
 ---
 
@@ -523,7 +689,7 @@ The native YANG models are maintained at: https://github.com/sonic-net/sonic-bui
 **GET a port using native YANG:**
 
 ```bash
-gnmic -a 1.18.1.3:50051 \
+gnmic -a 1.18.1.8:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -533,9 +699,9 @@ gnmic -a 1.18.1.3:50051 \
 ```json
 [
   {
-    "source": "1.18.1.3:50051",
-    "timestamp": 1764723311188651240,
-    "time": "2025-12-02T16:55:11.18865124-08:00",
+    "source": "1.18.1.8:50051",
+    "timestamp": 1777345111194308550,
+    "time": "2026-04-27T19:58:31.19430855-07:00",
     "updates": [
       {
         "Path": "sonic-port:sonic-port/PORT/PORT_LIST[name=Ethernet0]",
@@ -546,10 +712,10 @@ gnmic -a 1.18.1.3:50051 \
                 "admin_status": "up",
                 "alias": "etp0",
                 "index": 0,
-                "lanes": "2304,2305,2306,2307,2308,2309,2310,2311",
+                "lanes": "2304,2305,2306,2307",
                 "mtu": 9100,
                 "name": "Ethernet0",
-                "speed": 400000,
+                "speed": 100000,
                 "subport": 0
               }
             ]
@@ -572,7 +738,7 @@ OpenConfig models provide a vendor-neutral view of device configuration and stat
 **GET an interface using OpenConfig:**
 
 ```bash
-gnmic -a 1.18.1.3:50051 \
+gnmic -a 1.18.1.8:50051 \
   -u admin -p password \
   --insecure \
   get \
@@ -583,7 +749,9 @@ Output (abbreviated):
 ```json
 [
   {
-    "source": "1.18.1.3:50051",
+    "source": "1.18.1.8:50051",
+    "timestamp": 1777345112014496593,
+    "time": "2026-04-27T19:58:32.014496593-07:00",
     "updates": [
       {
         "Path": "openconfig-interfaces:interfaces/interface[name=Ethernet0]",
@@ -600,24 +768,30 @@ Output (abbreviated):
                 "name": "Ethernet0",
                 "openconfig-if-ethernet:ethernet": {
                   "config": {
-                    "port-speed": "openconfig-if-ethernet:SPEED_400GB"
+                    "port-speed": "openconfig-if-ethernet:SPEED_100GB"
                   },
                   "state": {
-                    "port-speed": "openconfig-if-ethernet:SPEED_400GB"
+                    "port-speed": "openconfig-if-ethernet:SPEED_100GB"
                   }
                 },
                 "state": {
                   "admin-status": "UP",
                   "counters": {
-                    "in-octets": "1115724",
-                    "in-pkts": "8521",
-                    "out-octets": "1076622",
-                    "out-pkts": "6304"
+                    "in-broadcast-pkts": "0",
+                    "in-discards": "0",
+                    "in-errors": "0",
+                    "in-octets": "0",
+                    "in-pkts": "0",
+                    "out-broadcast-pkts": "0",
+                    "out-discards": "0",
+                    "out-errors": "0",
+                    "out-octets": "0",
+                    "out-pkts": "0"
                   },
                   "enabled": true,
                   "mtu": 9100,
                   "name": "Ethernet0",
-                  "oper-status": "UP",
+                  "oper-status": "DOWN",
                   "type": "iana-if-type:ethernetCsmacd"
                 }
               }
@@ -651,32 +825,126 @@ All three approaches query the same device — the difference is in the data mod
 
 ### 2.7 gNMI SET — Making Configuration Changes
 
-gNMI is not just for reading — you can also push configuration changes using the SET RPC. Below is an example that changes the MTU on an interface.
+gNMI is not just for reading — you can also push configuration changes using the SET RPC. SET uses the OpenConfig model and requires `json_ietf` encoding. The path targets the config container, and the value wraps the field inside the module-prefixed container name.
 
-**Update MTU via sonic-db:**
+**Update MTU to 1500 via OpenConfig:**
 
 ```bash
-gnmic -a 1.18.1.3:50051 \
+gnmic -a 1.18.1.8:50051 \
   -u admin -p password \
   --insecure \
   set \
-  --update-path PORT/Ethernet0 \
-  --update-value '{"mtu": "1500"}' \
+  --update-path /openconfig-interfaces:interfaces/interface[name=Ethernet0]/config \
+  --update-value '{"openconfig-interfaces:config": {"mtu": 1500}}' \
+  --encoding json_ietf
+```
+
+```json
+{
+  "source": "1.18.1.8:50051",
+  "time": "1969-12-31T16:00:00-08:00",
+  "results": [
+    {
+      "operation": "UPDATE",
+      "path": "openconfig-interfaces:interfaces/interface[name=Ethernet0]/config"
+    }
+  ]
+}
+```
+
+**Verify** — Confirm the change via sonic-db GET:
+
+```bash
+gnmic -a 1.18.1.8:50051 \
+  -u admin -p password \
+  --insecure \
+  get \
+  --path PORT/Ethernet0 \
   --target CONFIG_DB
 ```
 
-**Update MTU via OpenConfig:**
+```json
+[
+  {
+    "source": "1.18.1.8:50051",
+    "target": "CONFIG_DB",
+    "updates": [
+      {
+        "Path": "PORT/Ethernet0",
+        "values": {
+          "PORT/Ethernet0": {
+            "admin_status": "up",
+            "alias": "etp0",
+            "index": "0",
+            "lanes": "2304,2305,2306,2307",
+            "mtu": "1500",
+            "speed": "100000"
+          }
+        }
+      }
+    ]
+  }
+]
+```
+
+The `mtu` field now shows `"1500"` — confirming the SET took effect in CONFIG_DB.
+
+**Revert MTU back to 9100:**
 
 ```bash
-gnmic -a 1.18.1.3:50051 \
+gnmic -a 1.18.1.8:50051 \
   -u admin -p password \
   --insecure \
   set \
-  --update-path openconfig-interfaces:interfaces/interface[name=Ethernet0]/config/mtu \
-  --update-value 1500
+  --update-path /openconfig-interfaces:interfaces/interface[name=Ethernet0]/config \
+  --update-value '{"openconfig-interfaces:config": {"mtu": 9100}}' \
+  --encoding json_ietf
 ```
 
-> **Important:** gNMI SET writes directly to CONFIG_DB. The change takes effect immediately but is not automatically saved to `/etc/sonic/config_db.json`. To persist, run `sudo config save -y` on the device.
+> **Important:** gNMI SET writes directly to CONFIG_DB. The change takes effect immediately but is not automatically saved to `/etc/sonic/config_db.json`. To persist, run `sudo config save -y` on the device — or set `"save_on_set": "true"` in the `GNMI|gnmi` configuration to have every SET automatically save.
+
+---
+
+### 2.8 gNMI SUBSCRIBE — Streaming Telemetry
+
+The SUBSCRIBE RPC opens a long-lived stream from the device. This is how gNMI delivers real-time telemetry — the device pushes updates to the collector instead of being polled.
+
+**Subscribe to a specific interface counter:**
+
+```bash
+gnmic -a 1.18.1.8:50051 \
+  -u admin -p password \
+  --insecure \
+  subscribe \
+  --path "COUNTERS/Ethernet0/SAI_PORT_STAT_IF_IN_OCTETS" \
+  --target COUNTERS_DB \
+  --stream-mode sample \
+  --sample-interval 5s
+```
+
+The device pushes the current value immediately, then continues streaming at the requested interval:
+
+```json
+{
+  "source": "1.18.1.8:50051",
+  "subscription-name": "default-1777347176",
+  "timestamp": 1777347118691257489,
+  "time": "2026-04-27T20:31:58.691257489-07:00",
+  "target": "COUNTERS_DB",
+  "updates": [
+    {
+      "Path": "COUNTERS/Ethernet0/SAI_PORT_STAT_IF_IN_OCTETS",
+      "values": {
+        "COUNTERS/Ethernet0/SAI_PORT_STAT_IF_IN_OCTETS": "0"
+      }
+    }
+  ]
+}
+```
+
+Press `Ctrl+C` to stop the subscription.
+
+SUBSCRIBE works with the sonic-db targets (`CONFIG_DB`, `APPL_DB`, `COUNTERS_DB`) and `OC_YANG` for OpenConfig paths. In production, collectors like Telegraf or gNMI pipeline ingest these updates continuously for monitoring dashboards and alerting.
 
 ---
 
@@ -690,7 +958,8 @@ This lab is complete. You have:
 - Walked through enabling gNMI on a SONiC device (configuration, restart, port verification)
 - Explored gNMI Capabilities to discover supported YANG models
 - Queried SONiC using all three gNMI data models: SONiC DB, SONiC Native YANG, and OpenConfig
-- Understood gNMI SET for pushing configuration changes directly to CONFIG_DB
+- Pushed configuration changes via gNMI SET using OpenConfig
+- Subscribed to streaming telemetry with gNMI SUBSCRIBE
 
 **Ansible** provides two methods of increasing sophistication:
 
@@ -699,14 +968,13 @@ This lab is complete. You have:
 | Shell commands | `ansible.builtin.shell` | Runs SONiC CLI commands via SSH |
 | cisco.sonic collection | `cisco.sonic.sonic_config` | Structured CLI over network_cli with error handling |
 
-**gNMI** provides programmatic access through three data models:
+**gNMI** provides programmatic access through four RPCs:
 
-| Model | Target Audience | Key Advantage |
-|-------|----------------|---------------|
-| SONiC DB (`sonic-db`) | SONiC operators, debugging | Direct database access, familiar Redis schema |
-| SONiC Native YANG | SONiC automation engineers | Typed data, YANG validation |
-| OpenConfig | Multi-vendor environments | Vendor-neutral, config + state separation |
+| RPC | Purpose | Key Detail |
+|-----|---------|------------|
+| Capabilities | Discover supported models and encodings | Always run first to understand what the device supports |
+| GET | Read configuration and state | Three models: sonic-db, native YANG, OpenConfig |
+| SET | Push configuration changes | Uses OpenConfig paths with `json_ietf` encoding |
+| SUBSCRIBE | Stream real-time telemetry | Device pushes updates to collector; works with sonic-db targets (CONFIG_DB, APPL_DB, COUNTERS_DB) and OC_YANG |
 
 Both Ansible and gNMI can be combined: use Ansible for orchestrating multi-device workflows and gNMI for granular, real-time device interactions.
-
-Proceed to [**Lab 4**](../lab_4/lab_4-guide.md) where we'll construct ACLs and secure SONiC's control plane.
