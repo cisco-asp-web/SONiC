@@ -1043,9 +1043,11 @@ Route  →  nexthop OID 0x400000000097e
 🔥 **Bonus:** To find the name of the outgoing interface, here is a little python script. Ethernet0 (not eth0 :)) is the outgoing interface.
 
 ```bash
-admin@pod9-leaf1:~$ sonic-db-cli COUNTERS_DB hgetall COUNTERS_PORT_NAME_MAP | \
-> python3 -c "import sys,ast; d=ast.literal_eval(sys.stdin.read()); \
-> print({v:k for k,v in d.items()}.get('oid:0x1000000000002','not found'))"
+sonic-db-cli COUNTERS_DB hgetall COUNTERS_PORT_NAME_MAP | python3 -c "
+import sys, ast
+d = ast.literal_eval(sys.stdin.read())
+print({v: k for k, v in d.items()}.get('oid:0x1000000000002', 'not found'))
+"
 
 
 Ethernet0
