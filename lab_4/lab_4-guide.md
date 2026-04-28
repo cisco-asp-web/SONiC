@@ -16,7 +16,7 @@ SONiC implements Access Control Lists (ACLs) in the switch pipeline to permit or
   - [Lab Objectives](#lab-objectives)
   - [Lab Environment and Shared  Prerequisites](#lab-environment-and-shared-prerequisites)
   - [Task 1 — L4 Ingress ACL and Verification](#task-1--l4-ingress-acl-and-verification)
-    - [1.1 — L4 TCP destination port 80 (HTTP)](#1.1--l4-tcp-destination-port-80-http)
+    - [1.1 — L4 TCP destination port 80 HTTP](#1.1--l4-tcp-destination-port-80-http)
   - [Task 2 — CoPP: Verification](#task-2--copp:-verification)
 
 ---
