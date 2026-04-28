@@ -15,9 +15,10 @@ SONiC implements Access Control Lists (ACLs) in the switch pipeline to permit or
   - [Table of Contents](#table-of-contents)
   - [Lab Objectives](#lab-objectives)
   - [Lab Environment and Shared  Prerequisites](#lab-environment-and-shared-prerequisites)
-  - [Task 1 — L4 Ingress ACL and Verification](#task-1--l4-ingress-acl-and-verification)
-    - [1.1 — L4 TCP destination port 80 HTTP](#1.1--l4-tcp-destination-port-80-http)
-  - [Task 2 — CoPP Verification](#task-2--copp-verification)
+  - [Task 1 SONiC ACL Overview](#task-1-sonic-acl-overview)
+  - [Task 2 — L4 Ingress ACL and Verification](#task-2--l4-ingress-acl-and-verification)
+    - [2.1 — L4 TCP destination port 80 HTTP](#2.1--l4-tcp-destination-port-80-http)
+  - [Task 3 — CoPP Verification](#task-3--copp-verification)
 
 ---
 
@@ -44,8 +45,100 @@ After this lab you should be able to:
 | **Outputs** | Samples show **shape** only — hostnames, times, PIDs, **Redis** DB numbers, **ACL IDs**, and **orchagent** args differ by image |
 
 ---
+## Task 1 SONiC ACL Overview
+The core of ACLs in SONiC is the ACL Table which links interface(s) with rule sets and defines the direction of the policy enforcement. See the diagram below to see the relationship.
 
-## Task 1 — L4 ingress ACL and Verification
+![ACL Overview](./topo-drawings/acl-overview.png)
+
+ACLs can be grouped into three general categories:
+    1. Data-plane ACLs applied against physical interfaces
+    2. Control plane ACLs
+    3. Mirror ACLs for capturing and replicating traffic
+   
+In this lab we will focus on the first type - Data-plane ACLs.
+
+> [!NOTE]
+> In SONiC ACL implementation is highly dependent on the supported features in the the network processing unit (NPU) of the switch/router. The below tables are all encompassing fields outlined in the SONiC documentation. Please consult your Cisco account team to understand which features are implemented on a particular switch/router platform.
+
+### ACL Tables
+The purpose of data-plane ACL tables is to link a set of rules that can be applied to data-plane traffic to a group of defined interfaces. 
+
+ACL tables can be created or deleted using either CLI or through a JSON definition which is loaded into the running config. We will show both options in this lab. 
+
+### ACL Table Parameters
+Data-plane ACL Tables have mandatory and optional defined fields as listed in the below table.
+
+| Parameters | CLI Flag | Mandatory | Details                                          |
+|:-----------|:--------:|:---------:|:-------------------------------------------------|
+| table name | none     | X         | The name of the ACL table to create.             |
+| table type | none     | X         | Type of ACL table to create. *See table above*   |
+| description| -d       |           | Table description. Defaults to table name        |
+| ports      | -p       |           | Binds table to physical port,portchannel, VLAN   |
+| stage      | -s       |           | Valid options are ingress (default) or egress    |
+
+
+**Table Type Field Definitions**
+| Type                | Description                       | Ingress | Egress  | 
+|:--------------------|:----------------------------------|:-------:|:-------:|
+| L3                  | Match on IPv ACL                  | X       | X       |
+| L3V6                | Match on IPv6 ACL                 | X       | X       |
+| L3VV6               | Match on IPv and v6 combined ACL  | X       | X       |
+| MIRROR              | Match on IPv4 ACL to mirror flow  | X       | X       |
+| MIRRORV6            | Match on IPv6 ACL to mirror flow  | X       | X       |
+| MIRROR_DSCP         | Match on DSCP ACL to mirror flow  | X       | X       |
+| PFCWD               | Research                          | X       | X       |
+| MLAG                | Research                          | X       | X       |
+| MUX                 | Research                          | X       | X       |
+| DROP                | Research                          | X       | X       |
+| CTRLPLANE           | Research                          | X       | X       |
+| DTEL_FLOW_WATCHLIST | Research                          | X       | X       |
+
+### ACL Rule Parameters
+ACL rule sets have a much larger parameter set than tables due to the complex nature of the ACL match option combinations. There are over 30 plus parameters list in the table below. In this lab we will use 2-3 as examples.
+
+- For reference on Ethernet Header see this link [HERE](https://en.wikipedia.org/wiki/Ethernet_frame)
+- For reference on IPv4 Packet Header see this link [HERE](https://en.wikipedia.org/wiki/Internet_Protocol_version_4#Header)
+- For reference on IPv6 Packet Header see this link [HERE](https://en.wikipedia.org/wiki/IPv6#IPv6_packets)
+- For reference on ICMP Packet Header see this link [HERE](https://en.wikipedia.org/wiki/Ping_(networking_utility)#ICMP_packet)
+- For referenec on VXLAN Packet Header see this link [HERE](https://learningnetwork.cisco.com/s/blogs/a0D3i000005YebJEAS/introduction-to-vxlan)
+
+**Match Table Parameters**
+
+| Type               | Description                                | Notes                                          | 
+|:-------------------|:-------------------------------------------|:-----------------------------------------------|
+| IN_PORTS           | Match Ingress Port                         |                                                |
+| OUT_PORTS          | Match Egress Port                          |                                                |
+| SRC_IP             | Match Source IPv4 Address                  | A valid IPv4 subnet in format IP/Mask          |
+| DST_IP             | Match Destination IPv4 Address             | A valid IPv4 subnet in format IP/Mask          |
+| SRC_IPV6           | Match Source IPv6 Address                  | A valid IPv6 subnet in format IP/Mask          |
+| DST_IPV6           | Match Destination IPv6 Address             | A valid IPv6 subnet in format IP/Mask          |
+| L4_SRC_PORT        | Match Source Layer 4 Port                  | Decimal integer [0..65535]                     |
+| L4_DST_PORT        | Match Destination Layer 4 Port             | Decimal integer [0..65535]                     |
+| L4_SRC_PORT_RANGE  | Match Source Layer 4 Port Range            | Two dash separated decimal integers [0..65535] |
+| L4_DST_PORT_RANGE  | Match Destination Layer 4 Port Range       | Two dash separated decimal integers [0..65535] |
+| ETHER_TYPE         | Match Ethernet Type Field                  |                                                |
+| VLAN_ID            | Match VLAN ID                              |                                                |
+| IP_PROTOCOL        | Match IP Protocol Number                   | Hexadecimal unsigned integer [0..FF]           |
+| NEXT_HEADER        | Match IPv6 Next Header Field               |                                                |
+| TCP_FLAGS          | Match TCP Flags Field                      | Hexadecimal unsigned integer [0..FF]           |
+| IP_TYPE            | Match IPv4 Options Type Field              | String of one type of: "IPv4"/"NON_IPv4"/"ARP" |
+| ETHER_TYPE         | Match Ethernet Type Field                  |                                                |
+| DSCP               | Match IPv4 Header DSCP Field               | DSCP (6b)                                      |
+| TC                 | Match IPv6 Header Traffic Class Field      | DSCP(6b) + ECN(2b)                             |
+| ICMP_TYPE          | Match ICMPv4 ICMP Type Field               |                                                |
+| ICMP_CODE          | Match ICMPv4 ICMP Code Field               |                                                |
+| ICMPV6_TYPE        | Match ICMPv6 Type Field                    |                                                |
+| ICMPV6_CODE        | Match ICMPv6 Options Field                 |                                                |
+| TUNNEL_VNI         | Match VXLAN VNID Field                     | VNI (24b)                                      |
+| INNER_ETHER_TYPE   | Match Inner Header Ethernet Type Field     |                                                |
+| INNER_IP_PROTOCOL  | Match Inner Header IP Protocol Number      |                                                |
+| INNER_L4_SRC_PORT  | Match Inner Header Source Layer 4 Port     |                                                |
+| INNER_L4_DST_PORT  | Match Inner Header Destination Layer 4 Port|                                                |
+| BTH_OPCODE         |                                            |                                                |
+| AETH_SYNDROME      |                                            |                                                |
+
+
+## Task 2 — L4 ingress ACL and Verification
 
 | Role | In this capture |
 |:-----|:-----------------|
@@ -433,7 +526,7 @@ sudo show platform npu acl ace -a 10483 -p 1
  | 10483  |    1     |    1/255    | 0.0.0.0/0.0.0.0 | 0.0.0.0/0.0.0.0 |
 ```
 
-### Task 1 — Verification checklist
+### Task 2 — Verification checklist
 
 - [ ] **`show acl rule`** — **10-ALLOW-ICMP** (**FORWARD**, **IP_PROTOCOL** 1) and **20-DENY-HTTP** (**DROP**, **IP_PROTOCOL** 6, **L4_DST_PORT** 80), both **Active**
 - [ ] **`show acl table`** — **ACL_DENY** on **Ethernet0**, description **ALLOW ICMP, BLOCK HTTP**
@@ -442,7 +535,7 @@ sudo show platform npu acl ace -a 10483 -p 1
 
 ---
 
-## Task 2 — CoPP Verification
+## Task 3 — CoPP Verification
 
 ### Objectives
 
