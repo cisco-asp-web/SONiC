@@ -25,13 +25,16 @@ SONiC runs on Debian Linux and exposes multiple configuration interfaces: a Pyth
     - [1.4 Ansible Summary](#14-ansible-summary)
   - [Task 2 — gNMI Automation](#task-2--gnmi-automation)
     - [2.1 Enabling gNMI on SONiC](#21-enabling-gnmi-on-sonic)
+      - [GNMI CONFIG\_DB Schema](#gnmi-config_db-schema)
+      - [Practical Example — Lab Configuration](#practical-example--lab-configuration)
     - [2.2 gNMI Capabilities](#22-gnmi-capabilities)
     - [2.3 SONiC DB GET — Querying CONFIG\_DB Directly](#23-sonic-db-get--querying-config_db-directly)
     - [2.4 SONiC Native YANG GET](#24-sonic-native-yang-get)
     - [2.5 OpenConfig GET](#25-openconfig-get)
     - [2.6 Comparing the Three gNMI Models](#26-comparing-the-three-gnmi-models)
     - [2.7 gNMI SET — Making Configuration Changes](#27-gnmi-set--making-configuration-changes)
-   - [2.8 gNMI SUBSCRIBE — Streaming Telemetry](#28-gnmi-subscribe--streaming-telemetry)
+    - [2.8 gNMI SUBSCRIBE — Streaming Telemetry](#28-gnmi-subscribe--streaming-telemetry)
+  - [End of Lab](#end-of-lab)
 4. [End of Lab](#end-of-lab)
 
 ---
@@ -978,3 +981,6 @@ This lab is complete. You have:
 | SUBSCRIBE | Stream real-time telemetry | Device pushes updates to collector; works with sonic-db targets (CONFIG_DB, APPL_DB, COUNTERS_DB) and OC_YANG |
 
 Both Ansible and gNMI can be combined: use Ansible for orchestrating multi-device workflows and gNMI for granular, real-time device interactions.
+
+
+Proceed to [**Lab 4 (ACL and CoPP)**](../lab_4/lab_4-guide.md) to learn how SONiC implements Access Control Lists and CoPP.
