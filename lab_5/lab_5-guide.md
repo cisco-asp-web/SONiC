@@ -375,7 +375,7 @@ evpn mh redirect-off
 
 ### Step 4.2 — VRF VNI Binding in FRR
 
-Run on **Leaf1, Leaf2, and Leaf3** — in `vtysh`:
+Run on **Leaf1, Leaf2, and Leaf3** — in `vtysh` and enter `config terminal`:
 ```
 vrf Vrfa
  vni 9900
@@ -386,7 +386,7 @@ exit-vrf
 
 > Only required on **Leaf1 and Leaf2**. Both must use the same `es-id` and `es-sys-mac`. Leaf3 requires no ESI configuration.
 
-Run on **Leaf1** — no explicit `es-df-pref` (defaults to 32767, wins DF election):
+Run on **Leaf1** — no explicit `es-df-pref` (defaults to 32767, wins DF election) `vtysh` and enter `config terminal`:
 ```
 interface PortChannel1
  evpn mh es-id 1
@@ -394,7 +394,7 @@ interface PortChannel1
 exit
 ```
 
-Run on **Leaf2** — explicit `es-df-pref 100` (loses DF election to Leaf1):
+Run on **Leaf2** — explicit `es-df-pref 100` (loses DF election to Leaf1) `vtysh` and enter `config terminal`:
 ```
 interface PortChannel1
  evpn mh es-id 1
@@ -411,7 +411,7 @@ exit
 
 Configure a loopback-to-loopback eBGP session to the spine's loopback (`4.4.4.4`) and enable EVPN address family.
 
-Run on **Leaf1**:
+Run on **Leaf1** `vtysh` and enter `config terminal`:
 ```
 router bgp 1
  neighbor 4.4.4.4 remote-as 4
@@ -432,7 +432,7 @@ router bgp 1
 exit
 ```
 
-Run on **Leaf2**:
+Run on **Leaf2** `vtysh` and enter `config terminal`:
 ```
 router bgp 2
  neighbor 4.4.4.4 remote-as 4
@@ -453,7 +453,7 @@ router bgp 2
 exit
 ```
 
-Run on **Leaf3** — includes both VNI 1010 (Vlan10) and VNI 2020 (Vlan20) route-targets:
+Run on **Leaf3** `vtysh` and enter `config terminal` — includes both VNI 1010 (Vlan10) and VNI 2020 (Vlan20) route-targets:
 ```
 router bgp 3
  neighbor 4.4.4.4 remote-as 4
@@ -482,7 +482,7 @@ exit
 
 Configure the per-VRF BGP process to redistribute connected routes and enable EVPN Type-5 advertisement.
 
-Run on **Leaf1**:
+Run on **Leaf1** `vtysh` and enter `config terminal`:
 ```
 router bgp 1 vrf Vrfa
  bgp router-id 1.1.1.1
@@ -502,7 +502,7 @@ router bgp 1 vrf Vrfa
 exit
 ```
 
-Run on **Leaf2**:
+Run on **Leaf2** `vtysh` and enter `config terminal`:
 ```
 router bgp 2 vrf Vrfa
  bgp router-id 2.2.2.2
@@ -522,7 +522,7 @@ router bgp 2 vrf Vrfa
 exit
 ```
 
-Run on **Leaf3**:
+Run on **Leaf3** `vtysh` and enter `config terminal`:
 ```
 router bgp 3 vrf Vrfa
  bgp router-id 3.3.3.3
@@ -544,7 +544,7 @@ exit
 
 > Leaf3's Vrfa VRF BGP process is identical to Leaf1/Leaf2. The `redistribute connected` picks up both 10.0.1.0/24 (Vlan10) and 10.0.2.0/24 (Vlan20) and advertises them as Type-5 routes via L3VNI 9900. Leaf1 and Leaf2 import these automatically — no config changes needed on them.
 
-### Step 4.6 — Route Server Configuration (Spine4 only)
+### Step 4.6 — Route Server Configuration (Spine4 only) `vtysh` and enter `config terminal`
 
 The spine reflects EVPN routes between leaves using `route-server-client` so next-hops and AS paths are preserved exactly as originated.
 
