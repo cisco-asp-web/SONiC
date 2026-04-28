@@ -45,4 +45,4 @@ Within each lab directory you should see several files of importance:
 | configs                  | Folder containing the configuration for the completed lab X  |
 | lab_X-guide.md           | User guide for this lab                                      |
 
-**Please proceed to Lab_0 to get started**: [LINK](./lab_0/lab_0_Getting_started.md)
+**Please proceed to Lab_0 to get started**: [LINK](./lab_0/lab_0-Getting_started.md)
