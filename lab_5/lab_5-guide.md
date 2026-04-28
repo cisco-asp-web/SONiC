@@ -368,7 +368,7 @@ sudo config save -y
 
 ### Step 4.1 — Global EVPN MH Setting
 
-Run on **Leaf1, Leaf2, and Leaf3** — enter `vtysh` first, then paste:
+Run on **Leaf1, Leaf2, and Leaf3** — enter `vtysh` and enter `config terminal`, then paste:
 ```
 evpn mh redirect-off
 ```
