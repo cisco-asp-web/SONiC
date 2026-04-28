@@ -39,13 +39,13 @@ SONiC runs on Debian Linux and exposes multiple configuration interfaces: a Pyth
 
 By completing this lab you will be able to:
 
-- [ ] Build an Ansible inventory for SONiC devices using SSH aliases
-- [ ] Write Ansible playbooks that configure SONiC using CLI commands via `ansible.builtin.shell`
-- [ ] Use the `cisco.sonic` Ansible collection for structured SONiC and FRR operations
-- [ ] Understand how gNMI is enabled on a SONiC device
-- [ ] Identify the three gNMI data models: SONiC DB, SONiC Native YANG, and OpenConfig
-- [ ] Read and interpret gNMI GET responses across all three models
-- [ ] Understand gNMI SET for pushing configuration changes
+- Build an Ansible inventory for SONiC devices using SSH aliases
+- Write Ansible playbooks that configure SONiC using CLI commands via `ansible.builtin.shell`
+- Use the `cisco.sonic` Ansible collection for structured SONiC and FRR operations
+- Understand how gNMI is enabled on a SONiC device
+- Identify the three gNMI data models: SONiC DB, SONiC Native YANG, and OpenConfig
+- Read and interpret gNMI GET responses across all three models
+- Understand gNMI SET for pushing configuration changes
 
 ---
 
