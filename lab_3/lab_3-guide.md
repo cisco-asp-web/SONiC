@@ -237,7 +237,7 @@ leaf_switches:
 **export proxy** - Prior to installing the Ansible cisco.sonic collection we'll need to set the http(s) proxy on our pods:
 ```bash
 export http_proxy="proxy-wsa.esl.cisco.com:80"
-export htt2_proxy="proxy-wsa.esl.cisco.com:80"
+export https_proxy="proxy-wsa.esl.cisco.com:80"
 ```
 
 **Run** — Install the collection (if not already installed):
