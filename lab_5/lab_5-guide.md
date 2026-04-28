@@ -1269,6 +1269,8 @@ exit
 route-map RM_SET_SRC permit 10
  set src 1.1.1.1
 exit
+route-map PASS permit 10
+exit
 ip protocol bgp route-map RM_SET_SRC
 ```
 
@@ -1289,6 +1291,8 @@ exit
 route-map RM_SET_SRC permit 10
  set src 2.2.2.2
 exit
+route-map PASS permit 10
+exit
 ip protocol bgp route-map RM_SET_SRC
 ```
 
@@ -1308,6 +1312,8 @@ exit
 
 route-map RM_SET_SRC permit 10
  set src 3.3.3.3
+exit
+route-map PASS permit 10
 exit
 ip protocol bgp route-map RM_SET_SRC
 ```
