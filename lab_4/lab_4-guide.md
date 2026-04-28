@@ -19,15 +19,6 @@ SONiC implements Access Control Lists (ACLs) in the switch pipeline to permit or
     - [gNMI](#gnmi)
   - [Task 1 — Ansible Automation](#task-1--ansible-automation)
     - [1.1 Ansible Inventory](#11-ansible-inventory)
-  
-| # | Section |
-|:-:|---------|
-| 1 | [Learning objectives](#learning-objectives) |
-| 2 | [Lab environment and shared prerequisites](#lab-environment-and-shared-prerequisites) |
-| 3 | [Guide flow (recommended order)](#guide-flow-recommended-order) |
-| 4 | [Exercise 1 — L4 ingress ACL (HTTP) and verification](#exercise-1--l4-ingress-acl-http-and-verification) — *Example 1 (L4 HTTP)* |
-| 5 | [Exercise 2 — CoPP: verification](#exercise-2--copp-verification) — *Verification Steps 1–5, troubleshooting, checklist* |
-| 6 | [Appendix — CoPP vs L3 ACL](#appendix--copp-vs-l3-acl-operational-distinction) |
 
 ---
 
@@ -45,7 +36,7 @@ flowchart LR
 
 ---
 
-## Learning objectives
+## Lab Objectives
 
 After this lab you should be able to:
 
@@ -57,7 +48,7 @@ After this lab you should be able to:
 
 ---
 
-## Lab environment and shared prerequisites
+## Lab Environment and Shared Prerequisites
 
 | Item | Detail |
 |------|--------|
@@ -69,7 +60,7 @@ After this lab you should be able to:
 
 ---
 
-## Exercise 1 — L4 ingress ACL (HTTP) and verification
+## Exercise 1 — L4 ingress ACL and verification
 
 | Role | In this capture |
 |:-----|:-----------------|
