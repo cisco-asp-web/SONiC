@@ -158,7 +158,7 @@ Each subsection: **why** the step matters, then bullets before code blocks for *
 
 ---
 
-### 1.1 — L4 TCP destination port 80 HTTP
+### 2.1 — L4 TCP destination port 80 HTTP
 
 This example uses the **L3** ACL **table type** on **Ethernet0** (**pod8-leaf3** in the capture) but matches **IP protocol** and **TCP destination port 80**. A **higher-priority** rule (**`PRIORITY`** **10**) **forwards ICMP** so echo/traceroute-style traffic can still work; a **lower-priority** rule (**20**) **drops TCP** to port **80** so HTTP clients time out. In SONiC, **lower numeric `PRIORITY`** is **higher precedence** in typical **`show acl rule`** ordering.
 
