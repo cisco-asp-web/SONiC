@@ -58,7 +58,7 @@ ACLs can be grouped into three general categories:
 In this lab we will focus on the first type - Data-plane ACLs.
 
 > [!NOTE]
-> In SONiC ACL implementation is highly dependent on the supported features in the the network processing unit (NPU) of the switch/router. The below tables are all encompassing fields outlined in the SONiC documentation. Please consult your Cisco account team to understand which features are implemented on a particular switch/router platform.
+> In SONiC, ACL implementation is highly dependent on the supported features in the the network processing unit (NPU) of the switch/router. The below tables are all encompassing fields outlined in the SONiC documentation. Please consult your Cisco account team to understand which features are implemented on a particular switch/router platform.
 
 ### ACL Tables
 The purpose of data-plane ACL tables is to link a set of rules that can be applied to data-plane traffic to a group of defined interfaces. 
