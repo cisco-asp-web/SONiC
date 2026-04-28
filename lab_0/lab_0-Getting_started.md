@@ -93,8 +93,8 @@ ssh leaf1
 # Once inside SONiC — check the version
 show version
 
-# Check interface status
-show interfaces status
+# Check platform 
+show platform summary
 
 # Exit back to your container
 exit
