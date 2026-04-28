@@ -948,3 +948,6 @@ Run **in order** for **post-change** validation, **upgrade** acceptance, or **in
 
 
 ## End of Lab 4
+
+
+Proceed to [**Lab 5 (VXLAN EVPN Fabric)**](../lab_5/lab_5-guide.md) to learn how we can implement and configure a VXLAN EVPN fabric in SONiC.

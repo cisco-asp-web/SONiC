@@ -1332,3 +1332,6 @@ exit
 ```
 
 After applying, return to [Task 2 — Verify Underlay](#task-2--verify-underlay) to confirm BGP is established and loopbacks are reachable.
+
+
+Proceed to [**Lab 6 (Building an AI Backend Network)**](../lab_6/lab_6-guide.md) to learn how we can implement and configure an AI Backend network fabric using SONiC.
