@@ -10,7 +10,7 @@ SONiC runs on Debian Linux and exposes multiple configuration interfaces: a Pyth
 
 ## Table of Contents
 
-- [Lab 3 Guide: SONiC Automation on Cisco 8000 \[25 Min\]](#lab-3-guide-sonic-automation-on-cisco-8000-25-min)
+- [Lab 3 Guide: SONiC Automation on Cisco 8000 \[45 Min\]](#lab-3-guide-sonic-automation-on-cisco-8000-45-min)
   - [Introduction](#introduction)
   - [Table of Contents](#table-of-contents)
   - [Lab Objectives](#lab-objectives)
