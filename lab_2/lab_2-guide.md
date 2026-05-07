@@ -60,41 +60,7 @@ FRR consists of a set of daemons, each responsible for a specific protocol:
 
 <img src="../drawings/frr-bgp-framework.png" width="800" />
 
-### FRR Routing Config Mode: `split-unified`
 
-In Lab 1 we briefly noted that SONiC uses `split-unified` as its routing configuration mode. Now that we are working directly with BGP, it is worth understanding exactly what this means and why it matters for everything you will do in this lab.
-
-SONiC supports three modes for how FRR daemon configuration is managed inside the `bgp` container:
-
-| Mode | Behaviour |
-|---|---|
-| `split` | One config file per FRR daemon (`bgpd.conf`, `ospfd.conf`, etc.) — legacy mode |
-| `unified` | A single `/etc/frr/frr.conf` for all daemons, managed manually |
-| `split-unified` | Single `frr.conf` **but** dynamically synced from `CONFIG_DB` via `bgpcfgd` |
-
-`split-unified` is the recommended and default mode in modern SONiC deployments. It is a hybrid that gives you the best of both worlds.
-
-#### What actually happens under the hood
-
-When `split-unified` is active, a SONiC-specific daemon called **`bgpcfgd`** runs inside the `bgp` container. Its sole job is to watch `CONFIG_DB` for BGP-related changes (neighbors, peer-groups, route-maps, timers, etc.) and translate them into FRR-native configuration, written into `/etc/frr/frr.conf`. The flow looks like this:
-
-```
-CONFIG_DB  ──►  bgpcfgd  ──►  /etc/frr/frr.conf  ──►  FRR daemons (bgpd, zebra …)
-     ▲                                                         │
-     │                    vtysh (direct FRR CLI)  ────────────►│
-     │                         │
-     └──  config bgp …  ───────┘  (writes back to CONFIG_DB)
-```
-
-This has a critical operational implication: **`vtysh` and SONiC `config` commands are both valid entry points**, but they write to different places. Changes made via `vtysh` go directly to FRR and are reflected immediately, but they will be **overwritten by `bgpcfgd`** on the next CONFIG_DB sync unless you also update the database. For persistent, database-driven configuration always prefer the SONiC `config bgp` commands or editing `config_db.json`. Use `vtysh` for live troubleshooting and temporary verification.
-
-#### Why this matters for this BGP lab
-
-Throughout this lab you will use `vtysh` extensively to inspect BGP state, verify neighbor adjacencies, and examine the RIB. You will also use `config` commands to define peers and policy. Understanding that these two interfaces co-exist — and that `bgpcfgd` is the bridge between them — explains several behaviours you will observe:
-
-- Why a BGP neighbor you configure via `config bgp` appears in `vtysh show bgp neighbors` almost immediately
-- Why manually editing `/etc/frr/frr.conf` directly is **not recommended** — `bgpcfgd` will overwrite it
-- Why `docker exec bgp cat /etc/frr/frr.conf` is a useful diagnostic: it shows the exact FRR config that `bgpcfgd` has generated from the database at that moment
 
 ### Task 1 — SONiC mode
 
