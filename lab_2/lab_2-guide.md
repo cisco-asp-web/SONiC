@@ -126,23 +126,6 @@ Copyright 1996-2005 Kunihiro Ishiguro, et al.
 pod9-leaf1#
 ```
 
-#### `vtysh` and SONiC's `split-unified` Mode — What You Need to Know
-
-As covered in the previous section, `bgpcfgd` owns part of `/etc/frr/frr.conf` and syncs it from `CONFIG_DB`. **But it only manages what the SONiC abstraction layer knows about.** This creates a clean division of responsibility that is important to understand before starting the lab:
-
-| Configuration | Who manages it | How to configure |
-|---|---|---|
-| Basic BGP neighbors, peer-groups | `bgpcfgd` ← `CONFIG_DB` | `config bgp` SONiC commands |
-| Route-maps, prefix-lists | FRR directly | `vtysh` + `write memory` |
-| Address-family activation | `bgpcfgd` ← `CONFIG_DB` | `config bgp` SONiC commands |
-| Redistribution, timers, advanced BGP | FRR directly | `vtysh` + `write memory` |
-
-In this lab, **all configuration is done via `vtysh`**. This is intentional — route-maps, prefix-lists, and the BGP policy constructs you will build are not abstracted by SONiC's config layer, so `vtysh` is the correct and only interface for them. `write memory` is valid and necessary here.
-
-The one thing to avoid is **mixing both approaches for the same object**. For example, if you create a BGP neighbor via `config bgp neighbor add`, then try to modify that same neighbor in `vtysh`, `bgpcfgd` may overwrite your change on its next sync cycle. Since this lab uses `vtysh` end-to-end, you will not hit this conflict.
-
-> 💡 **Rule of thumb:** if it is in `CONFIG_DB` because you put it there with a `config` command, manage it via `config` commands. If you built it in `vtysh`, manage it in `vtysh`. Don't cross the streams.
-
 
 #### Key `vtysh` Commands for This Lab
 
